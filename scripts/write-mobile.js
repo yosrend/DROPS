@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+const fs = require('fs');
+const before = `import { useEffect, useRef, useState } from "react";
 import { Plus, X, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useGyroTilt } from "../hooks/useGyroTilt";
@@ -304,7 +305,7 @@ function SuccessState({ card, onExplore }: { card: NewCard; onExplore: () => voi
             height: i % 3 === 0 ? 8 : 5,
             borderRadius: i % 2 === 0 ? "50%" : 2,
             background: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-            left: `${6 + (i * 4.2) % 88}%`,
+            left: \`\${6 + (i * 4.2) % 88}%\`,
             top: -10,
           }}
           animate={{
@@ -453,13 +454,13 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
         [-vw, 0, vw].forEach((xOff) => {
           [-vh, 0, vh].forEach((yOff) => {
             const el = document.createElement("div");
-            el.style.cssText = `position:absolute;border-radius:20px;overflow:hidden;user-select:none;will-change:transform,filter,opacity;backface-visibility:hidden;display:flex;flex-direction:column;justify-content:space-between;width:${w}px;height:${h}px;background:${data.bg};left:${bx + xOff}px;top:${by + yOff}px;box-shadow:0 8px 32px rgba(0,0,0,0.35);font-family:Inter,sans-serif;`;
-            el.innerHTML = `
-              <div style="font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:${mutedColor};font-weight:500;padding:14px 14px 0">Config 2025</div>
-              <div style="font-size:14px;font-weight:700;color:${textColor};line-height:1.3;padding:8px 14px;flex:1;display:flex;align-items:center">${data.quote}</div>
-              <div style="font-size:10px;color:${mutedColor};padding:0 14px 14px">${data.handle}</div>
-              <div style="position:absolute;top:12px;right:12px;width:5px;height:5px;border-radius:50%;background:${light ? "rgba(17,17,17,0.25)" : "rgba(255,255,255,0.6)"}"></div>
-            `;
+            el.style.cssText = \`position:absolute;border-radius:20px;overflow:hidden;user-select:none;will-change:transform,filter,opacity;backface-visibility:hidden;display:flex;flex-direction:column;justify-content:space-between;width:\${w}px;height:\${h}px;background:\${data.bg};left:\${bx + xOff}px;top:\${by + yOff}px;box-shadow:0 8px 32px rgba(0,0,0,0.35);font-family:Inter,sans-serif;\`;
+            el.innerHTML = [
+              '<div style="font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:',mutedColor,';font-weight:500;padding:14px 14px 0">Config 2025</div>',
+              '<div style="font-size:14px;font-weight:700;color:',textColor,';line-height:1.3;padding:8px 14px;flex:1;display:flex;align-items:center">',data.quote,'</div>',
+              '<div style="font-size:10px;color:',mutedColor,';padding:0 14px 14px">',data.handle,'</div>',
+              '<div style="position:absolute;top:12px;right:12px;width:5px;height:5px;border-radius:50%;background:',light ? "rgba(17,17,17,0.25)" : "rgba(255,255,255,0.6)",'"></div>',
+            ].join("");
             el.dataset.cardIndex = String(logicalIdx);
             el.addEventListener("mouseenter", () => { s.hoveredIndex = logicalIdx; });
             el.addEventListener("mouseleave", () => { s.hoveredIndex = null; });
@@ -482,7 +483,6 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
       s.spread = sp; s.depthGap = dg; s.zoom = zm;
       const loop = LAYERS * dg;
       cards.forEach(({ el, nx, ny, w, h, rot }, idx) => {
-        // compute current position from spread + normalized coords
         const spPx = (nx - s.cx) * sp + s.cx;
         const spPy = (ny - s.cy) * sp + s.cy;
         const cBx = spPx * vw - w / 2;
@@ -505,7 +505,7 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
         el.style.visibility = "visible";
         el.style.opacity = String(op);
         el.style.zIndex = String(Math.round(z + 6000));
-        el.style.transform = `translate3d(${rx}px,${ry}px,${z}px) scale(${finalScale}) rotate(${rot}deg)`;
+        el.style.transform = \`translate3d(\${rx}px,\${ry}px,\${z}px) scale(\${finalScale}) rotate(\${rot}deg)\`;
         el.style.filter = "none";
         el.style.cursor = s.hoveredIndex === idx ? "pointer" : "default";
         el.style.boxShadow = s.hoveredIndex === idx
@@ -518,7 +518,6 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
       const centers = cards.filter(c => c.isCenter);
       const total = centers.length;
       const idx = s.cardIdx;
-      // hide all, then show relevant center copies
       cards.forEach(c => { c.el.style.visibility = "hidden"; c.el.style.opacity = "0"; });
       centers.forEach((c, i) => {
         const rel = ((i - idx) % total + total) % total;
@@ -599,7 +598,7 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
           const cx = vw / 2 - top.w / 2;
           const cy = vh / 2 - top.h / 2 - 20;
           const rot = s.dragCurX * 0.06;
-          top.el.style.transform = `translate3d(${s.dragCurX}px,${Math.abs(s.dragCurX) * .05}px,0) rotate(${rot}deg) scale(1)`;
+          top.el.style.transform = \`translate3d(\${s.dragCurX}px,\${Math.abs(s.dragCurX) * .05}px,0) rotate(\${rot}deg) scale(1)\`;
         }
         return;
       }
@@ -617,7 +616,7 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
           const dir = s.dragCurX > 0 ? 1 : -1;
           if (top) {
             top.el.style.transition = "transform .35s cubic-bezier(.55,.06,.68,.19),opacity .3s";
-            top.el.style.transform = `translateX(${dir * 500}px) rotate(${dir * 20}deg) scale(0.9)`;
+            top.el.style.transform = \`translateX(\${dir * 500}px) rotate(\${dir * 20}deg) scale(0.9)\`;
             top.el.style.opacity = "0";
           }
           setTimeout(() => {
@@ -763,9 +762,9 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
             Spacing & Zoom
           </div>
           {[
-            { label: "Spread", val: spread, set: setSpread, min: 0.2, max: 1.5, step: 0.05, ref: spreadRef },
-            { label: "Depth", val: depthGap, set: setDepthGap, min: 200, max: 1200, step: 50, ref: depthGapRef },
-            { label: "Zoom", val: zoom, set: setZoom, min: 0.5, max: 2.5, step: 0.05, ref: zoomRef },
+            { label: "Spread", val: spread, set: setSpread, min: 0.2, max: 1.5, step: 0.05 },
+            { label: "Depth", val: depthGap, set: setDepthGap, min: 200, max: 1200, step: 50 },
+            { label: "Zoom", val: zoom, set: setZoom, min: 0.5, max: 2.5, step: 0.05 },
           ].map(({ label, val, set, min, max, step }) => (
             <div key={label} style={{ marginBottom: 10 }}>
               <div style={{
@@ -790,355 +789,9 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
       )}
     </div>
   );
-}
+}`;
 
-// ── Mobile Stack View ─────────────────────────────────────────────────────────
-
-function MobileView({ onAdd }: { onAdd: () => void }) {
-  const [mode, setMode] = useState<"stack" | "scatter">("stack");
-  const [scrollPos, setScrollPos] = useState(0);
-  const [panX, setPanX] = useState(0);
-  const [scattering, setScattering] = useState(false);
-  const rafRef = useRef<number>(0);
-
-  // pinch state
-  const [scatterScale, setScatterScale] = useState(1);
-  const pinchStartDistanceRef = useRef<number | null>(null);
-  const pinchStartScaleRef = useRef(1);
-  const pinchTriggeredRef = useRef(false);
-
-  // gyro
-  const gyro = useGyroTilt();
-
-  // viewport dimensions
-  const [vp, setVp] = useState({ w: window.innerWidth, h: window.innerHeight });
-
-  useEffect(() => {
-    const onResize = () => setVp({ w: window.innerWidth, h: window.innerHeight });
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  // smooth snap to nearest card
-  const snapToNearest = (from: number) => {
-    const nearest = Math.round(from);
-    const start = from;
-    const diff = nearest - start;
-    const dur = 300;
-    if (Math.abs(diff) < 0.01) { setScrollPos(nearest); return; }
-    const t0 = performance.now();
-    const animate = (now: number) => {
-      const dt = Math.min((now - t0) / dur, 1);
-      const e = 1 - Math.pow(1 - dt, 3);
-      setScrollPos(start + diff * e);
-      if (dt < 1) rafRef.current = requestAnimationFrame(animate);
-    };
-    cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(animate);
-  };
-
-  const drag = useRef({ active: false, startX: 0, startY: 0, baseScroll: 0 });
-  const tap = useRef({ count: 0, timer: null as ReturnType<typeof setTimeout> | null });
-  const pan = useRef({ active: false, lastX: 0 });
-
-  const CARD_PITCH = 70;
-
-  const toggleMode = () => {
-    if (mode === "stack") {
-      setScattering(true);
-      cancelAnimationFrame(rafRef.current);
-      setMode("scatter");
-      setPanX(0);
-      setScatterScale(1);
-      setTimeout(() => setScattering(false), 700);
-    } else {
-      setMode("stack");
-      setScatterScale(1);
-      setScrollPos(0);
-    }
-  };
-
-  const handleClick = () => {
-    const t = tap.current;
-    t.count++;
-    if (t.timer) clearTimeout(t.timer);
-    t.timer = setTimeout(() => {
-      if (t.count >= 2) toggleMode();
-      t.count = 0;
-    }, 280);
-  };
-
-  function getTouchDistance(touches: TouchList) {
-    const [a, b] = [touches[0], touches[1]];
-    const dx = a.clientX - b.clientX;
-    const dy = a.clientY - b.clientY;
-    return Math.sqrt(dx * dx + dy * dy);
-  }
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      pinchStartDistanceRef.current = getTouchDistance(e.touches);
-      pinchStartScaleRef.current = scatterScale;
-      pinchTriggeredRef.current = false;
-    }
-  };
-
-  const onTouchMove = (e: React.TouchEvent) => {
-    if (e.touches.length === 2 && pinchStartDistanceRef.current) {
-      const currentDist = getTouchDistance(e.touches);
-      const diff = currentDist - pinchStartDistanceRef.current;
-      if (mode === "stack") {
-        if (diff < -35 && !pinchTriggeredRef.current) {
-          pinchTriggeredRef.current = true;
-          setMode("scatter");
-          setScattering(true);
-          setPanX(0);
-          setTimeout(() => setScattering(false), 700);
-        }
-        return;
-      }
-      if (mode === "scatter") {
-        const nextScale = Math.min(1.4, Math.max(0.7, pinchStartScaleRef.current + diff / 300));
-        setScatterScale(nextScale);
-        if (diff > 35 && !pinchTriggeredRef.current) {
-          pinchTriggeredRef.current = true;
-          setMode("stack");
-          setScatterScale(1);
-          setScrollPos(0);
-        }
-      }
-      return;
-    }
-    if (e.touches.length === 1) {
-      const touch = e.touches[0];
-      if (mode === "scatter") {
-        pan.current = { active: true, lastX: touch.clientX };
-        return;
-      }
-      if (!drag.current.active) {
-        drag.current = { active: true, startX: touch.clientX, startY: touch.clientY, baseScroll: scrollPos };
-      }
-      const dy = touch.clientY - drag.current.startY;
-      cancelAnimationFrame(rafRef.current);
-      setScrollPos(drag.current.baseScroll - dy / CARD_PITCH);
-    }
-  };
-
-  const onTouchEnd = () => {
-    if (pinchStartDistanceRef.current !== null) {
-      pinchStartDistanceRef.current = null;
-      pinchTriggeredRef.current = false;
-    }
-    if (mode === "scatter") { pan.current.active = false; return; }
-    if (!drag.current.active) return;
-    drag.current.active = false;
-    snapToNearest(scrollPos);
-  };
-
-  const onPointerDown = (e: React.PointerEvent) => {
-    if (mode === "scatter") { pan.current = { active: true, lastX: e.clientX }; return; }
-    drag.current = { active: true, startX: e.clientX, startY: e.clientY, baseScroll: scrollPos };
-  };
-
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (mode === "scatter" && pan.current.active) {
-      setPanX(p => p + (e.clientX - pan.current.lastX));
-      pan.current.lastX = e.clientX;
-      return;
-    }
-    if (!drag.current.active) return;
-    const dy = e.clientY - drag.current.startY;
-    cancelAnimationFrame(rafRef.current);
-    setScrollPos(drag.current.baseScroll - dy / CARD_PITCH);
-  };
-
-  const onPointerUp = () => {
-    if (mode === "scatter") { pan.current.active = false; return; }
-    if (!drag.current.active) return;
-    drag.current.active = false;
-    snapToNearest(scrollPos);
-  };
-
-  const getStyle = (i: number): React.CSSProperties => {
-    const h = MOBILE_HEIGHTS[i];
-    const baseX = (vp.w - CARD_W) / 2;
-    const baseY = (vp.h - h) / 2;
-    const card = CARDS_DATA[i];
-
-    const base: React.CSSProperties = {
-      position: "absolute",
-      width: CARD_W,
-      height: h,
-      background: card.bg,
-      borderRadius: 20,
-      overflow: "hidden",
-      display: "flex",
-      flexDirection: "column",
-      justifyContent: "space-between",
-      boxShadow: "0 4px 24px rgba(0,0,0,0.12)",
-      fontFamily: "Inter,sans-serif",
-    };
-
-    if (mode === "scatter") {
-      const p = SCATTER_POS[i % SCATTER_POS.length];
-      return {
-        ...base,
-        left: p.x,
-        top: p.y,
-        transform: [
-          "translateX(" + (panX + gyro.offsetX) + "px)",
-          "translateY(" + gyro.offsetY + "px)",
-          "scale(" + scatterScale + ")",
-          "rotate(" + p.r + "deg)",
-        ].join(" "),
-        transformOrigin: "center center",
-        opacity: 1,
-        zIndex: 10 + i,
-        visibility: "visible",
-        pointerEvents: "auto",
-        transition: scattering
-          ? "transform 560ms cubic-bezier(.34,1.2,.64,1), opacity 420ms ease, left 560ms cubic-bezier(.34,1.2,.64,1), top 560ms cubic-bezier(.34,1.2,.64,1)"
-          : "none",
-        transitionDelay: scattering ? (i * 25 + "ms") : "0ms",
-      };
-    }
-
-    // continuous scroll stack mode
-    const rel = i - scrollPos;
-    const dist = Math.abs(rel);
-    const yOff = rel * CARD_PITCH;
-
-    if (dist < 0.5) {
-      const scale = 1 - dist * 0.12;
-      const op = 1 - dist * 0.2;
-      return {
-        ...base,
-        left: baseX,
-        top: baseY,
-        transform: [
-          "perspective(900px)",
-          "rotateX(" + gyro.rotateX + "deg)",
-          "rotateY(" + gyro.rotateY + "deg)",
-          "translateY(" + yOff + "px)",
-          "scale(" + scale + ")",
-        ].join(" "),
-        opacity: op,
-        zIndex: 50,
-        visibility: "visible",
-        pointerEvents: "auto",
-        transition: "none",
-      };
-    }
-    if (dist < 1.5) {
-      const s = 0.94 - (dist - 0.5) * 0.12;
-      const o = 0.8 - (dist - 0.5) * 0.3;
-      return {
-        ...base,
-        left: baseX, top: baseY,
-        transform: "translateY(" + yOff + "px) rotate(2.5deg) scale(" + s + ")",
-        opacity: o,
-        filter: "blur(0.5px)",
-        zIndex: 40,
-        visibility: "visible",
-        pointerEvents: "none",
-        transition: "none",
-      };
-    }
-    if (dist < 2.5) {
-      const s = 0.82 - (dist - 1.5) * 0.06;
-      const o = 0.5 - (dist - 1.5) * 0.3;
-      return {
-        ...base,
-        left: baseX, top: baseY,
-        transform: "translateY(" + yOff + "px) rotate(-1.5deg) scale(" + Math.max(s, 0.7) + ")",
-        opacity: Math.max(o, 0.05),
-        filter: "blur(1px)",
-        zIndex: 30,
-        visibility: "visible",
-        pointerEvents: "none",
-        transition: "none",
-      };
-    }
-    return { ...base, visibility: "hidden", opacity: 0, zIndex: 5, pointerEvents: "none" };
-  };
-
-  const nearestCard = Math.round(scrollPos);
-  const clampedCard = ((nearestCard % CARDS_DATA.length) + CARDS_DATA.length) % CARDS_DATA.length;
-
-  return (
-    <div className="relative w-screen h-[100dvh] min-h-[100dvh] overflow-hidden bg-white select-none" style={{ fontFamily: "Inter,sans-serif" }}>
-      <div className="absolute top-0 left-0 right-0 flex justify-between items-center px-5 pt-4 z-[200] pointer-events-none">
-        <span style={{ fontSize: 12, fontWeight: 500, color: "rgba(17,17,17,0.4)", letterSpacing: ".04em" }}>Drops \u2726</span>
-        <span style={{ fontSize: 11, color: "rgba(17,17,17,0.3)" }}>2.4k drops</span>
-      </div>
-
-      <div
-        className="absolute inset-0 flex items-center justify-center pb-[88px]"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerLeave={onPointerUp}
-        onPointerCancel={onPointerUp}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-        onClick={handleClick}
-        style={{ touchAction: "none" }}
-      >
-        <div className="relative flex h-[520px] w-full items-center justify-center">
-          {CARDS_DATA.map((card, i) => (
-            <div key={i} style={getStyle(i)}>
-              <CardFace quote={card.quote} handle={card.handle} bg={card.bg} />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {mode === "stack" && (
-        <div className="absolute z-[100] pointer-events-none whitespace-nowrap"
-          style={{ bottom: 90, left: "50%", transform: "translateX(-50%)", fontSize: 10, color: "#aaa", fontFamily: "Inter,sans-serif" }}>
-          {clampedCard + 1} of {CARDS_DATA.length}
-        </div>
-      )}
-
-      {mode === "stack" && (
-        <div className="absolute z-[100] pointer-events-none whitespace-nowrap"
-          style={{ bottom: 74, left: "50%", transform: "translateX(-50%)", fontSize: 9, color: "#ccc", letterSpacing: ".04em", fontFamily: "Inter,sans-serif" }}>
-          double tap to scatter
-        </div>
-      )}
-
-      {mode === "stack" && gyro.supported && (
-        <button
-          onClick={(e) => { e.stopPropagation(); gyro.requestPermission(); }}
-          className="absolute z-[100]"
-          style={{ bottom: 56, left: "50%", transform: "translateX(-50%)", fontSize: 9, color: "#bbb", fontFamily: "Inter,sans-serif", textDecoration: "underline" }}>
-          Enable motion
-        </button>
-      )}
-
-      <button
-        onClick={e => { e.stopPropagation(); onAdd(); }}
-        className="absolute z-[200] flex items-center justify-center gap-2 transition-transform active:scale-95"
-        style={{
-          bottom: 28, right: 20,
-          height: 52, paddingInline: 20,
-          borderRadius: 26,
-          background: "#111",
-          color: "#fff",
-          fontSize: 13,
-          fontWeight: 500,
-          fontFamily: "Inter,sans-serif",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
-          whiteSpace: "nowrap",
-        }}>
-        <Plus size={16} color="#fff" />
-        Leave your mark
-      </button>
-    </div>
-  );
-}
-
+const after = `
 // ── Desktop Card Gallery Modal ────────────────────────────────────────────────
 
 function CardGalleryModal({
@@ -1199,9 +852,9 @@ function CardGalleryModal({
           </div>
         </div>
         <div className="mt-4 flex items-center gap-2 text-sm">
-          <button className="rounded-full bg-black/5 px-3 py-1">❤️ 24</button>
-          <button className="rounded-full bg-black/5 px-3 py-1">🔥 12</button>
-          <button className="rounded-full bg-black/5 px-3 py-1">✨ 40</button>
+          <button className="rounded-full bg-black/5 px-3 py-1">\\u2764\\ufe0f 24</button>
+          <button className="rounded-full bg-black/5 px-3 py-1">\\ud83d\\udd25 12</button>
+          <button className="rounded-full bg-black/5 px-3 py-1">\\u2728 40</button>
         </div>
         <div className="mt-4 rounded-2xl bg-black/5 p-3">
           <div className="text-xs text-black/40">Comments</div>
@@ -1276,3 +929,7 @@ export default function App() {
     </div>
   );
 }
+`;
+
+fs.writeFileSync('src/app/App_temp.tsx', before + '\n' + after);
+console.log('Written');

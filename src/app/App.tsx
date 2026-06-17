@@ -857,7 +857,7 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
   const tap = useRef({ count: 0, timer: null as ReturnType<typeof setTimeout> | null });
   const pan = useRef({ active: false, lastX: 0 });
 
-  const CARD_PITCH = 25;
+  const CARD_PITCH = 50;
 
   // scatter launch animation effect
   useEffect(() => {
@@ -1060,12 +1060,9 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
     const yOff = rel * CARD_PITCH;
 
     if (dist < 0.5) {
-      const scale = 1 + (0.5 - dist) * 0.08;
-      const op = 1;
+      const scale = 1 + (0.5 - dist) * 0.06;
       return {
-        ...base,
-        left: baseX,
-        top: baseY,
+        ...base, left: baseX, top: baseY,
         transform: [
           "perspective(900px)",
           "rotateX(" + gyro.rotateX + "deg)",
@@ -1073,58 +1070,45 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
           "translateY(" + yOff + "px)",
           "scale(" + scale + ")",
         ].join(" "),
-        opacity: op,
-        zIndex: 50,
-        visibility: "visible",
-        pointerEvents: "auto",
-        transition: "none",
+        opacity: 1, zIndex: 50, visibility: "visible", pointerEvents: "auto", transition: "none",
       };
     }
     if (dist < 1) {
       const t = (dist - 0.5) * 2;
-      const s = 1.04 - t * 0.2;
-      const o = 1 - t * 0.3;
       return {
-        ...base,
-        left: baseX, top: baseY,
-        transform: "translateY(" + yOff + "px) scale(" + s + ")",
-        opacity: o,
-        zIndex: 44,
-        visibility: "visible",
-        pointerEvents: "none",
-        transition: "none",
+        ...base, left: baseX, top: baseY,
+        transform: "translateY(" + yOff + "px) scale(" + (1.03 - t * 0.1) + ")",
+        opacity: 1 - t * 0.2,
+        zIndex: 46, visibility: "visible", pointerEvents: "none", transition: "none",
       };
     }
     if (dist < 1.5) {
       const t = (dist - 1) * 2;
-      const s = 0.84 - t * 0.08;
-      const o = 0.7 - t * 0.3;
       return {
-        ...base,
-        left: baseX, top: baseY,
-        transform: "translateY(" + yOff + "px) scale(" + s + ")",
-        opacity: Math.max(o, 0.1),
-        filter: "blur(0.5px)",
-        zIndex: 38,
-        visibility: "visible",
-        pointerEvents: "none",
-        transition: "none",
+        ...base, left: baseX, top: baseY,
+        transform: "translateY(" + yOff + "px) scale(" + (0.93 - t * 0.06) + ")",
+        opacity: 0.8 - t * 0.2,
+        zIndex: 42, visibility: "visible", pointerEvents: "none", transition: "none",
       };
     }
-    if (dist < 2.5) {
-      const t = (dist - 1.5) / 1;
-      const s = 0.76 - t * 0.1;
-      const o = 0.4 - t * 0.2;
+    if (dist < 2) {
+      const t = (dist - 1.5) * 2;
       return {
-        ...base,
-        left: baseX, top: baseY,
-        transform: "translateY(" + yOff + "px) scale(" + Math.max(s, 0.66) + ")",
-        opacity: Math.max(o, 0.05),
+        ...base, left: baseX, top: baseY,
+        transform: "translateY(" + yOff + "px) scale(" + (0.87 - t * 0.05) + ")",
+        opacity: 0.6 - t * 0.2,
+        filter: "blur(0.5px)",
+        zIndex: 38, visibility: "visible", pointerEvents: "none", transition: "none",
+      };
+    }
+    if (dist < 3) {
+      const t = (dist - 2) / 1;
+      return {
+        ...base, left: baseX, top: baseY,
+        transform: "translateY(" + yOff + "px) scale(" + Math.max(0.82 - t * 0.08, 0.7) + ")",
+        opacity: Math.max(0.4 - t * 0.15, 0.1),
         filter: "blur(1px)",
-        zIndex: 30,
-        visibility: "visible",
-        pointerEvents: "none",
-        transition: "none",
+        zIndex: 34, visibility: "visible", pointerEvents: "none", transition: "none",
       };
     }
     return { ...base, visibility: "hidden", opacity: 0, zIndex: 5, pointerEvents: "none" };

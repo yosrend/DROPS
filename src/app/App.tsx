@@ -822,7 +822,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
   }, []);
 
   const STACK_PITCH = 50;
-  const CAROUSEL_PITCH = 280;
+  const CAROUSEL_PITCH = 60;
 
   // snap helper for both axes
   const snapToNearest = (from: number, setter: (v: number) => void) => {
@@ -968,8 +968,11 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
         setScrollPos(drag.current.baseScroll - dy / STACK_PITCH);
       } else if (mode === "carousel") {
         const dx = touch.clientX - drag.current.startX;
+        const dy = touch.clientY - drag.current.startY;
+        // up/down maps to carousel left/right: up→prev(left), down→next(right)
+        const axis = Math.abs(dx) > Math.abs(dy) ? dx : -dy;
         cancelAnimationFrame(rafRef.current);
-        setScrollPosX(drag.current.baseScrollX - dx / CAROUSEL_PITCH);
+        setScrollPosX(drag.current.baseScrollX - axis / 60);
       }
     }
   };
@@ -1054,7 +1057,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
       const cxCopies = [i, i + total, i - total];
       const cxClosest = cxCopies.reduce((a, b) => Math.abs(b - scrollPosX) < Math.abs(a - scrollPosX) ? b : a);
       const cxRel = cxClosest - scrollPosX;
-      const cxOff = cxRel * 60;
+      const cxOff = cxRel * CAROUSEL_PITCH;
       const cxScale = 1 + (0.5 - Math.min(Math.abs(cxRel), 0.5)) * 0.05;
 
       return {
@@ -1075,7 +1078,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
         visibility: "visible",
         pointerEvents: "auto",
         transition: isAnim
-          ? "transform 560ms cubic-bezier(.34,1.2,.64,1), left 560ms cubic-bezier(.34,1.2,.64,1), top 560ms cubic-bezier(.34,1.2,.64,1)"
+          ? "transform 700ms cubic-bezier(.4,0,.2,1), left 700ms cubic-bezier(.4,0,.2,1), top 700ms cubic-bezier(.4,0,.2,1)"
           : "none",
         transitionDelay: depthDelay,
       };
@@ -1087,7 +1090,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
       const closest = copies.reduce((a, b) => Math.abs(b - scrollPosX) < Math.abs(a - scrollPosX) ? b : a);
       const rel = closest - scrollPosX;
       const dist = Math.abs(rel);
-      const xOff = rel * 60;
+      const xOff = rel * CAROUSEL_PITCH;
       const depthDelay = animPhase === 2 ? (dist * 40 + "ms") : "0ms";
       const isAnim = animPhase === 2;
 
@@ -1105,7 +1108,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
             ? "translateY(" + stackYOff + "px)"
             : "translateX(" + xOff + "px) scale(" + s + ")",
           opacity: 1, zIndex: 50, visibility: "visible", pointerEvents: "auto",
-          transition: isAnim ? "transform 560ms cubic-bezier(.34,1.2,.64,1)" : "none",
+          transition: isAnim ? "transform 700ms cubic-bezier(.4,0,.2,1)" : "none",
           transitionDelay: depthDelay,
         };
       }
@@ -1118,7 +1121,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
             ? "translateY(" + stackYOff + "px) scale(" + s + ")"
             : "translateX(" + xOff + "px) scale(" + s + ")",
           opacity: 1 - t * 0.2, zIndex: 46, visibility: "visible", pointerEvents: "none",
-          transition: isAnim ? "transform 560ms cubic-bezier(.34,1.2,.64,1)" : "none",
+          transition: isAnim ? "transform 700ms cubic-bezier(.4,0,.2,1)" : "none",
           transitionDelay: depthDelay,
         };
       }
@@ -1131,7 +1134,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
             ? "translateY(" + stackYOff + "px) scale(" + s + ")"
             : "translateX(" + xOff + "px) scale(" + s + ")",
           opacity: 0.8 - t * 0.2, zIndex: 42, visibility: "visible", pointerEvents: "none",
-          transition: isAnim ? "transform 560ms cubic-bezier(.34,1.2,.64,1)" : "none",
+          transition: isAnim ? "transform 700ms cubic-bezier(.4,0,.2,1)" : "none",
           transitionDelay: depthDelay,
         };
       }
@@ -1145,7 +1148,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
             : "translateX(" + xOff + "px) scale(" + s + ")",
           opacity: Math.max(0.6 - t * 0.2, 0.1),
           filter: "blur(0.5px)", zIndex: 38, visibility: "visible", pointerEvents: "none",
-          transition: isAnim ? "transform 560ms cubic-bezier(.34,1.2,.64,1)" : "none",
+          transition: isAnim ? "transform 700ms cubic-bezier(.4,0,.2,1)" : "none",
           transitionDelay: depthDelay,
         };
       }
@@ -1163,7 +1166,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
     const stCopies = [i, i + total, i - total];
     const stClosest = stCopies.reduce((a, b) => Math.abs(b - scrollPosX) < Math.abs(a - scrollPosX) ? b : a);
     const stRel = stClosest - scrollPosX;
-    const stXOff = stRel * 60;
+    const stXOff = stRel * CAROUSEL_PITCH;
 
     const isAnim = animPhase === 2;
     const startPos = animPhase === 1 ? "translateX(" + stXOff + "px) " : "";
@@ -1183,7 +1186,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
               "scale(" + scale + ")",
             ].join(" "),
         opacity: 1, zIndex: 50, visibility: "visible", pointerEvents: "auto",
-        transition: isAnim ? "transform 560ms cubic-bezier(.34,1.2,.64,1)" : "none",
+        transition: isAnim ? "transform 700ms cubic-bezier(.4,0,.2,1)" : "none",
       };
     }
     if (dist < 1) {
@@ -1196,7 +1199,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
           : "translateY(" + yOff + "px) scale(" + s + ")",
         opacity: 1 - t * 0.2,
         zIndex: 46, visibility: "visible", pointerEvents: "none",
-        transition: isAnim ? "transform 560ms cubic-bezier(.34,1.2,.64,1)" : "none",
+        transition: isAnim ? "transform 700ms cubic-bezier(.4,0,.2,1)" : "none",
       };
     }
     if (dist < 1.5) {
@@ -1209,7 +1212,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
           : "translateY(" + yOff + "px) scale(" + s + ")",
         opacity: 0.8 - t * 0.2,
         zIndex: 42, visibility: "visible", pointerEvents: "none",
-        transition: isAnim ? "transform 560ms cubic-bezier(.34,1.2,.64,1)" : "none",
+        transition: isAnim ? "transform 700ms cubic-bezier(.4,0,.2,1)" : "none",
       };
     }
     if (dist < 2) {
@@ -1223,7 +1226,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
         opacity: 0.6 - t * 0.2,
         filter: "blur(0.5px)",
         zIndex: 38, visibility: "visible", pointerEvents: "none",
-        transition: isAnim ? "transform 560ms cubic-bezier(.34,1.2,.64,1)" : "none",
+        transition: isAnim ? "transform 700ms cubic-bezier(.4,0,.2,1)" : "none",
       };
     }
     if (dist < 3) {
@@ -1237,7 +1240,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
         opacity: Math.max(0.4 - t * 0.15, 0.1),
         filter: "blur(1px)",
         zIndex: 34, visibility: "visible", pointerEvents: "none",
-        transition: isAnim ? "transform 560ms cubic-bezier(.34,1.2,.64,1)" : "none",
+        transition: isAnim ? "transform 700ms cubic-bezier(.4,0,.2,1)" : "none",
       };
     }
     return { ...base, visibility: "hidden", opacity: 0, zIndex: 5, pointerEvents: "none" };

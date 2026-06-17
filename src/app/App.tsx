@@ -799,6 +799,7 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
   const [current, setCurrent] = useState(0);
   const [panX, setPanX] = useState(0);
   const [dragOffset, setDragOffset] = useState(0);
+  const [dragOffsetY, setDragOffsetY] = useState(0);
   const [flyingOut, setFlyingOut] = useState(false);
   const [scattering, setScattering] = useState(false);
 
@@ -826,7 +827,7 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  const drag = useRef({ active: false, startX: 0 });
+  const drag = useRef({ active: false, startX: 0, startY: 0 });
   const tap = useRef({ count: 0, timer: null as ReturnType<typeof setTimeout> | null });
   const pan = useRef({ active: false, lastX: 0 });
 
@@ -907,8 +908,11 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
         pan.current = { active: true, lastX: touch.clientX };
         return;
       }
-      drag.current = { active: true, startX: touch.clientX };
-      setDragOffset(0);
+      if (!drag.current.active) {
+        drag.current = { active: true, startX: touch.clientX, startY: touch.clientY };
+      }
+      setDragOffset(touch.clientX - drag.current.startX);
+      setDragOffsetY(touch.clientY - drag.current.startY);
     }
   };
 
@@ -920,22 +924,30 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
     if (mode === "scatter") { pan.current.active = false; return; }
     if (!drag.current.active) return;
     drag.current.active = false;
-    if (Math.abs(dragOffset) > 95 && !flyingOut) {
+    const absX = Math.abs(dragOffset);
+    const absY = Math.abs(dragOffsetY);
+    if ((absX > 95 || absY > 95) && !flyingOut) {
       setFlyingOut(true);
+      const dir = absY > absX
+        ? (dragOffsetY < 0 ? 1 : -1)  // up=next, down=prev
+        : 1;  // horizontal=next
       setTimeout(() => {
-        setCurrent(c => (c + 1) % CARDS_DATA.length);
+        setCurrent(c => (c + dir + CARDS_DATA.length) % CARDS_DATA.length);
         setDragOffset(0);
+        setDragOffsetY(0);
         setFlyingOut(false);
       }, 360);
     } else {
       setDragOffset(0);
+      setDragOffsetY(0);
     }
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (mode === "scatter") { pan.current = { active: true, lastX: e.clientX }; return; }
-    drag.current = { active: true, startX: e.clientX };
+    drag.current = { active: true, startX: e.clientX, startY: e.clientY };
     setDragOffset(0);
+    setDragOffsetY(0);
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -946,21 +958,29 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
     }
     if (!drag.current.active) return;
     setDragOffset(e.clientX - drag.current.startX);
+    setDragOffsetY(e.clientY - drag.current.startY);
   };
 
   const onPointerUp = () => {
     if (mode === "scatter") { pan.current.active = false; return; }
     if (!drag.current.active) return;
     drag.current.active = false;
-    if (Math.abs(dragOffset) > 95 && !flyingOut) {
+    const absX = Math.abs(dragOffset);
+    const absY = Math.abs(dragOffsetY);
+    if ((absX > 95 || absY > 95) && !flyingOut) {
       setFlyingOut(true);
+      const dir = absY > absX
+        ? (dragOffsetY < 0 ? 1 : -1)  // up=next, down=prev
+        : 1;  // horizontal=next
       setTimeout(() => {
-        setCurrent(c => (c + 1) % CARDS_DATA.length);
+        setCurrent(c => (c + dir + CARDS_DATA.length) % CARDS_DATA.length);
         setDragOffset(0);
+        setDragOffsetY(0);
         setFlyingOut(false);
       }, 360);
     } else {
       setDragOffset(0);
+      setDragOffsetY(0);
     }
   };
 
@@ -968,7 +988,7 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
     const total = CARDS_DATA.length;
     const h = MOBILE_HEIGHTS[i];
     const baseX = (vp.w - CARD_W) / 2;
-    const baseY = (vp.h - h) / 2 - 40;
+    const baseY = (vp.h - h) / 2 - 10;
     const card = CARDS_DATA[i];
 
     const base: React.CSSProperties = {
@@ -1012,7 +1032,11 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
     const rel = ((i - current) % total + total) % total;
 
     if (rel === 0) {
-      const off = flyingOut ? (dragOffset >= 0 ? 500 : -500) : dragOffset;
+      const absY = Math.abs(dragOffsetY);
+      const isVertical = absY > Math.abs(dragOffset);
+      const flyDir = isVertical ? dragOffsetY : dragOffset;
+      const off = flyingOut ? (flyDir >= 0 ? 500 : -500) : dragOffset;
+      const offY = flyingOut ? (dragOffsetY >= 0 ? 400 : -400) : dragOffsetY;
       const rot = flyingOut ? (dragOffset >= 0 ? 20 : -20) : dragOffset * 0.07;
       return {
         ...base,
@@ -1022,6 +1046,7 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
           rotateX(${gyro.rotateX}deg)
           rotateY(${gyro.rotateY}deg)
           translateX(${off}px)
+          translateY(${offY}px)
           rotate(${rot}deg)
           scale(1)
         `,

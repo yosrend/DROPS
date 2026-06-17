@@ -1,5 +1,17 @@
-import { getSupabase } from "../lib/supabase";
 import { getDeviceId } from "../utils/device";
+import { isSupabaseAvailable } from "../lib/supabase";
+
+async function getSupabase(): Promise<any | null> {
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (!url || !key) return null;
+  try {
+    // Dynamic import - Vite splits this into separate chunk
+    const sdk = await import(/* @vite-ignore */ "@supabase/supabase-js");
+    if (sdk?.createClient) return sdk.createClient(url, key);
+  } catch { /* supabase not available */ }
+  return null;
+}
 import { CARDS_KEY, MAX_CARDS, type UserCard } from "../app/data/defaults";
 import type { DropInput, DropPost } from "../types/drop";
 
@@ -20,7 +32,7 @@ function setStorage(cards: UserCard[]) {
 // ── public API ──
 
 export async function getDrops(): Promise<UserCard[]> {
-  const sb = getSupabase();
+  const sb = await getSupabase();
   if (sb) {
     try {
       const { data } = await sb
@@ -45,7 +57,7 @@ export async function createDrop(input: DropInput): Promise<UserCard | null> {
     if (url) contentUrl = url;
   }
 
-  const sb = getSupabase();
+  const sb = await getSupabase();
   if (sb) {
     try {
       const { data, error } = await sb
@@ -95,7 +107,7 @@ export async function createDrop(input: DropInput): Promise<UserCard | null> {
 }
 
 export async function uploadDropAsset(file: File, deviceId: string): Promise<string | null> {
-  const sb = getSupabase();
+  const sb = await getSupabase();
   if (!sb) return null;
 
   const ext = file.name.split(".").pop() || "png";
@@ -115,7 +127,7 @@ export async function uploadDropAsset(file: File, deviceId: string): Promise<str
 }
 
 export async function getDropCountByDevice(deviceId: string): Promise<number> {
-  const sb = getSupabase();
+  const sb = await getSupabase();
   if (sb) {
     try {
       const { count } = await sb
@@ -135,7 +147,7 @@ export async function canDeviceCreateDrop(deviceId: string): Promise<boolean> {
 }
 
 export async function updateDrop(id: string, updates: Partial<DropPost>): Promise<boolean> {
-  const sb = getSupabase();
+  const sb = await getSupabase();
   if (!sb) return false;
   try {
     await sb.from(TABLE).update(updates).eq("id", id);
@@ -144,7 +156,7 @@ export async function updateDrop(id: string, updates: Partial<DropPost>): Promis
 }
 
 export async function deleteDrop(id: string, contentUrl?: string): Promise<boolean> {
-  const sb = getSupabase();
+  const sb = await getSupabase();
   if (!sb) return false;
   try {
     if (contentUrl) {

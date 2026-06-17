@@ -7,3 +7,9 @@ html, body, #root {
   margin: 0;
   padding: 0;
 }
+
+.dotted-bg {
+  background-color: #FFFDF7;
+  background-image: radial-gradient(circle, #e5e0d8 1px, transparent 1px);
+  background-size: 20px 20px;
+}

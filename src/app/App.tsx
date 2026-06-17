@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { Plus, X, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useGyroTilt } from "../hooks/useGyroTilt";
+import Onboarding from "./components/Onboarding";
+import AddCardModal from "./components/AddCardModal";
+import { CardFace } from "./components/CardFace";
+import { ONBOARDING_KEY, CARDS_KEY, type UserCard } from "./data/defaults";
 
 // ── data ─────────────────────────────────────────────────────────────────────
 
@@ -94,279 +98,9 @@ function isLightBg(bg: string) {
   return bg === "#FFCD29" || bg === "#F5F0E8";
 }
 
-function CardFace({ quote, handle, bg, small = false }: {
-  quote: string; handle: string; bg: string; small?: boolean;
-}) {
-  const light = isLightBg(bg);
-  const textColor = light ? "rgba(17,17,17,0.9)" : "#fff";
-  const mutedColor = light ? "rgba(17,17,17,0.4)" : "rgba(255,255,255,0.45)";
-  return (
-    <>
-      <div style={{
-        fontSize: small ? 7 : 8, textTransform: "uppercase", letterSpacing: ".1em",
-        color: mutedColor, fontWeight: 500,
-        padding: small ? "12px 12px 0" : "14px 14px 0",
-      }}>
-        Config 2025
-      </div>
-      <div style={{
-        fontSize: small ? 13 : 15, fontWeight: 700, color: textColor, lineHeight: 1.3,
-        padding: small ? "6px 12px" : "8px 14px",
-        flex: 1, display: "flex", alignItems: "center",
-      }}>
-        {quote}
-      </div>
-      <div style={{
-        fontSize: small ? 9 : 10, color: mutedColor,
-        padding: small ? "0 12px 12px" : "0 14px 14px",
-      }}>
-        {handle}
-      </div>
-      <div style={{
-        position: "absolute", top: small ? 10 : 12, right: small ? 10 : 12,
-        width: 5, height: 5, borderRadius: "50%",
-        background: light ? "rgba(17,17,17,0.25)" : "rgba(255,255,255,0.6)",
-      }} />
-    </>
-  );
-}
-
-// ── Card Creator Modal ────────────────────────────────────────────────────────
-
-type NewCard = { bg: string; quote: string; handle: string };
-
-function CardModal({ onClose, onPost }: {
-  onClose: () => void;
-  onPost: (card: NewCard) => void;
-}) {
-  const [step, setStep] = useState<"creating" | "success">("creating");
-  const [styleIdx, setStyleIdx] = useState(0);
-  const [quote, setQuote] = useState("");
-  const [handle, setHandle] = useState("");
-  const [newCard, setNewCard] = useState<NewCard | null>(null);
-
-  const chosen = CARD_STYLES[styleIdx];
-
-  const handlePost = () => {
-    if (!quote.trim()) return;
-    const card: NewCard = { bg: chosen.bg, quote: quote.trim(), handle: handle.trim() || "@you" };
-    setNewCard(card);
-    setStep("success");
-    onPost(card);
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
-      className="fixed inset-0 z-[500] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(16px)" }}
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ scale: 0.92, opacity: 0, y: 24 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.92, opacity: 0, y: 24 }}
-        transition={{ type: "spring", stiffness: 420, damping: 32 }}
-        className="relative w-full max-w-[420px] rounded-3xl overflow-hidden"
-        style={{ background: "#0e0e0e", border: "1px solid rgba(255,255,255,0.1)" }}
-        onClick={e => e.stopPropagation()}
-      >
-        {step === "creating" ? (
-          <div className="p-6 space-y-5">
-            {/* header */}
-            <div className="flex justify-between items-start">
-              <div>
-                <p style={{ color: "#fff", fontWeight: 600, fontSize: 17, fontFamily: "Inter,sans-serif" }}>
-                  Leave your mark
-                </p>
-                <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 12, fontFamily: "Inter,sans-serif", marginTop: 2 }}>
-                  Config 2025 · Community Wall
-                </p>
-              </div>
-              <button
-                onClick={onClose}
-                className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-white/10"
-                style={{ background: "rgba(255,255,255,0.07)" }}
-              >
-                <X size={14} color="rgba(255,255,255,0.6)" />
-              </button>
-            </div>
-
-            {/* preview card */}
-            <div className="flex justify-center">
-              <div
-                className="relative flex flex-col justify-between overflow-hidden"
-                style={{
-                  width: 160, height: 220, borderRadius: 20,
-                  background: chosen.bg,
-                  boxShadow: "0 12px 48px rgba(0,0,0,0.5)",
-                  fontFamily: "Inter,sans-serif",
-                }}
-              >
-                <CardFace quote={quote || "Your story here…"} handle={handle || "@you"} bg={chosen.bg} small />
-              </div>
-            </div>
-
-            {/* style picker */}
-            <div>
-              <p style={{
-                color: "rgba(255,255,255,0.35)", fontSize: 10, fontFamily: "Inter,sans-serif",
-                letterSpacing: ".08em", textTransform: "uppercase", marginBottom: 8,
-              }}>Style</p>
-              <div className="flex gap-2 flex-wrap">
-                {CARD_STYLES.map((s, i) => (
-                  <button
-                    key={i}
-                    title={s.label}
-                    onClick={() => setStyleIdx(i)}
-                    className="w-8 h-8 rounded-full transition-transform hover:scale-110 flex-shrink-0"
-                    style={{
-                      background: s.bg,
-                      outline: styleIdx === i ? "2px solid #fff" : "2px solid transparent",
-                      outlineOffset: 2,
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* inputs */}
-            <div className="space-y-3">
-              <textarea
-                value={quote}
-                onChange={e => setQuote(e.target.value)}
-                placeholder="What do you want to say?"
-                maxLength={120}
-                rows={3}
-                className="w-full rounded-2xl px-4 py-3 text-sm resize-none outline-none placeholder:text-white/25"
-                style={{
-                  background: "rgba(255,255,255,0.06)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  color: "#fff",
-                  fontFamily: "Inter,sans-serif",
-                }}
-              />
-              <input
-                value={handle}
-                onChange={e => setHandle(e.target.value)}
-                placeholder="@your_handle"
-                className="w-full rounded-2xl px-4 py-3 text-sm outline-none placeholder:text-white/25"
-                style={{
-                  background: "rgba(255,255,255,0.06)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  color: "#fff",
-                  fontFamily: "Inter,sans-serif",
-                }}
-              />
-            </div>
-
-            {/* post */}
-            <button
-              onClick={handlePost}
-              disabled={!quote.trim()}
-              className="w-full h-12 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 transition-all"
-              style={{
-                background: quote.trim() ? "#7B61FF" : "rgba(123,97,255,0.25)",
-                color: quote.trim() ? "#fff" : "rgba(255,255,255,0.4)",
-                fontFamily: "Inter,sans-serif",
-                cursor: quote.trim() ? "pointer" : "not-allowed",
-              }}
-            >
-              Drop it <ArrowRight size={15} />
-            </button>
-          </div>
-        ) : (
-          newCard && <SuccessState card={newCard} onExplore={onClose} />
-        )}
-      </motion.div>
-    </motion.div>
-  );
-}
-
-// ── Success State ─────────────────────────────────────────────────────────────
+// ── Card Creator Modal (imported from AddCardModal) ──────────────────────
 
 const CONFETTI_COLORS = ["#7B61FF", "#F24822", "#1ABCFE", "#FFCD29", "#fff", "#7B61FF", "#F24822"];
-
-function SuccessState({ card, onExplore }: { card: NewCard; onExplore: () => void }) {
-  return (
-    <div className="p-6 text-center relative overflow-hidden" style={{ fontFamily: "Inter,sans-serif" }}>
-      {/* confetti */}
-      {Array.from({ length: 22 }).map((_, i) => (
-        <motion.div
-          key={i}
-          className="absolute pointer-events-none"
-          style={{
-            width: i % 3 === 0 ? 8 : 5,
-            height: i % 3 === 0 ? 8 : 5,
-            borderRadius: i % 2 === 0 ? "50%" : 2,
-            background: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-            left: `${6 + (i * 4.2) % 88}%`,
-            top: -10,
-          }}
-          animate={{
-            y: [0, 280 + (i % 5) * 30],
-            x: [(i % 2 === 0 ? 1 : -1) * ((i * 7) % 40)],
-            rotate: [0, (i % 2 === 0 ? 1 : -1) * (180 + (i * 30) % 180)],
-            opacity: [1, 1, 0],
-          }}
-          transition={{
-            duration: 1.2 + (i % 4) * 0.25,
-            delay: (i % 6) * 0.08,
-            ease: "easeIn",
-          }}
-        />
-      ))}
-
-      {/* floating card */}
-      <div className="flex justify-center pt-2 mb-6">
-        <motion.div
-          className="relative flex flex-col justify-between overflow-hidden"
-          style={{
-            width: 160, height: 220, borderRadius: 20,
-            background: card.bg,
-            boxShadow: "0 16px 56px rgba(0,0,0,0.55)",
-            fontFamily: "Inter,sans-serif",
-          }}
-          initial={{ scale: 0.65, rotate: -8, opacity: 0, y: 20 }}
-          animate={{ scale: 1, rotate: 4, opacity: 1, y: 0 }}
-          transition={{ type: "spring", stiffness: 280, damping: 18, delay: 0.1 }}
-        >
-          <CardFace quote={card.quote} handle={card.handle} bg={card.bg} small />
-        </motion.div>
-      </div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.35, duration: 0.4 }}
-      >
-        <p style={{ color: "#fff", fontWeight: 700, fontSize: 18 }}>You left your mark ✦</p>
-        <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 13, marginTop: 4 }}>
-          Your card is now on the wall
-        </p>
-      </motion.div>
-
-      <motion.button
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5, duration: 0.4 }}
-        onClick={onExplore}
-        className="w-full h-12 rounded-2xl text-sm font-medium flex items-center justify-center gap-2 mt-5 transition-colors hover:bg-white/10"
-        style={{
-          background: "rgba(255,255,255,0.08)",
-          color: "#fff",
-          border: "1px solid rgba(255,255,255,0.12)",
-        }}
-      >
-        Explore the wall
-      </motion.button>
-    </div>
-  );
-}
 
 // ── Desktop Tunnel View ───────────────────────────────────────────────────────
 
@@ -1386,6 +1120,23 @@ export default function App() {
   const [showModal, setShowModal] = useState(false);
   const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
 
+  // onboarding gate
+  const [onboarded, setOnboarded] = useState(() => localStorage.getItem(ONBOARDING_KEY) === "true");
+
+  // localStorage persistence
+  const [userCards, setUserCards] = useState<UserCard[]>(() => {
+    try {
+      const stored = localStorage.getItem(CARDS_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
+  const [newCardId, setNewCardId] = useState<string | null>(null);
+
+  // save user cards to localStorage
+  useEffect(() => {
+    localStorage.setItem(CARDS_KEY, JSON.stringify(userCards));
+  }, [userCards]);
+
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", h);
@@ -1398,41 +1149,54 @@ export default function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setSelectedCardIndex(null);
       if (e.key === "ArrowRight") {
-        setSelectedCardIndex(i => i !== null ? (i + 1) % CARDS_DATA.length : null);
+        setSelectedCardIndex(i => i !== null ? (i + 1) % combinedCards.length : null);
       }
       if (e.key === "ArrowLeft") {
-        setSelectedCardIndex(i => i !== null ? (i - 1 + CARDS_DATA.length) % CARDS_DATA.length : null);
+        setSelectedCardIndex(i => i !== null ? (i - 1 + combinedCards.length) % combinedCards.length : null);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedCardIndex]);
+  }, [selectedCardIndex, userCards.length]);
 
-  const handlePost = (_card: NewCard) => {
-    // would push to wall data
+  const combinedCards = [...CARDS_DATA, ...userCards.map(u => ({
+    bg: u.bg,
+    quote: u.type === "sticker" ? u.stickerLabel || u.quote : u.quote,
+    handle: u.handle,
+  }))];
+
+  const handlePost = (card: UserCard) => {
+    setUserCards(prev => [...prev, card]);
+    setNewCardId(card.id);
+    setTimeout(() => setNewCardId(null), 3000);
   };
 
+  // onboarding
+  if (!onboarded) {
+    return <Onboarding onComplete={() => setOnboarded(true)} />;
+  }
+
   return (
-    <div className="w-full h-full" style={{ fontFamily: "Inter, sans-serif" }}>
+    <div className="w-full h-full dotted-bg" style={{ fontFamily: "Inter, sans-serif" }}>
       {isMobile
-        ? <MobileView onAdd={() => setShowModal(true)} onCardSelect={(i) => setSelectedCardIndex(i)} />
-        : <DesktopView onAdd={() => setShowModal(true)} onCardSelect={(i) => setSelectedCardIndex(i)} />
+        ? <MobileView key={userCards.length} onAdd={() => setShowModal(true)} onCardSelect={(i) => setSelectedCardIndex(i)} />
+        : <DesktopView key={userCards.length} onAdd={() => setShowModal(true)} onCardSelect={(i) => setSelectedCardIndex(i)} />
       }
 
       <AnimatePresence>
         {showModal && (
-          <CardModal onClose={() => setShowModal(false)} onPost={handlePost} />
+          <AddCardModal onClose={() => setShowModal(false)} onPost={handlePost} cardCount={userCards.length} />
         )}
       </AnimatePresence>
 
-      {selectedCardIndex !== null && (
+      {selectedCardIndex !== null && combinedCards[selectedCardIndex] && (
         <CardGalleryModal
-          card={CARDS_DATA[selectedCardIndex]}
+          card={combinedCards[selectedCardIndex]}
           index={selectedCardIndex}
-          total={CARDS_DATA.length}
+          total={combinedCards.length}
           onClose={() => setSelectedCardIndex(null)}
-          onPrev={() => setSelectedCardIndex(i => i !== null ? (i - 1 + CARDS_DATA.length) % CARDS_DATA.length : null)}
-          onNext={() => setSelectedCardIndex(i => i !== null ? (i + 1) % CARDS_DATA.length : null)}
+          onPrev={() => setSelectedCardIndex(i => i !== null ? (i - 1 + combinedCards.length) % combinedCards.length : null)}
+          onNext={() => setSelectedCardIndex(i => i !== null ? (i + 1) % combinedCards.length : null)}
         />
       )}
     </div>

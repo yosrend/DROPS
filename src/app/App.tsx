@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Plus, X, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { useGyroTilt } from "../hooks/useGyroTilt";
 
 // ── data ─────────────────────────────────────────────────────────────────────
 
@@ -353,7 +354,7 @@ function SuccessState({ card, onExplore }: { card: NewCard; onExplore: () => voi
 
 // ── Desktop Tunnel View ───────────────────────────────────────────────────────
 
-function DesktopView({ onAdd }: { onAdd: () => void }) {
+function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect: (index: number) => void }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const setModeRef = useRef<(m: "scatter" | "card") => void>(() => {});
@@ -373,7 +374,8 @@ function DesktopView({ onAdd }: { onAdd: () => void }) {
     const s = {
       mode: "scatter" as "scatter" | "card",
       panX: 0, panY: 0, tPanX: 0, tPanY: 0,
-      scrollZ: 0,
+      scrollZ: 0, targetScrollZ: 0,
+      hoveredIndex: null as number | null,
       isDown: false, holdActive: false,
       holdTimer: null as ReturnType<typeof setTimeout> | null,
       lmx: 0, lmy: 0,
@@ -415,6 +417,14 @@ function DesktopView({ onAdd }: { onAdd: () => void }) {
           <div style="font-size:10px;color:${mutedColor};padding:0 14px 14px">${data.handle}</div>
           <div style="position:absolute;top:12px;right:12px;width:5px;height:5px;border-radius:50%;background:${light ? "rgba(17,17,17,0.25)" : "rgba(255,255,255,0.6)"}"></div>
         `;
+        el.dataset.cardIndex = String(cards.length);
+        el.addEventListener("mouseenter", () => { s.hoveredIndex = cards.length; });
+        el.addEventListener("mouseleave", () => { s.hoveredIndex = null; });
+        el.addEventListener("click", () => {
+          if (s.mode === "scatter") {
+            onCardSelect(cards.length % CARDS_DATA.length);
+          }
+        });
         canvas.appendChild(el);
         cards.push({ el, bx, by, bz, rot, w, h, bg: data.bg });
       }
@@ -422,7 +432,7 @@ function DesktopView({ onAdd }: { onAdd: () => void }) {
 
     const drawScatter = () => {
       const loop = LAYERS * DEPTH;
-      cards.forEach(({ el, bx, by, bz, rot }) => {
+      cards.forEach(({ el, bx, by, bz, rot }, idx) => {
         const rx = bx + s.panX;
         const ry = by + s.panY;
         let z = ((bz + s.scrollZ) % loop + loop) % loop;
@@ -430,16 +440,20 @@ function DesktopView({ onAdd }: { onAdd: () => void }) {
         const far = -DEPTH * (LAYERS - 1) - 200;
         const near = 460;
         const t = (z - far) / (near - far);
-        const sc = Math.max(.04, .20 + t * .92);
+        const baseScale = Math.max(.04, .20 + t * .92);
+        const hoverScale = s.hoveredIndex === idx ? 1.08 : 1;
+        const finalScale = baseScale * hoverScale;
         const op = Math.max(0, Math.min(1, t * 1.9 - .15));
-        const blur = blurAmt(z);
         if (z < -4200 || z > 680) { el.style.visibility = "hidden"; return; }
         el.style.visibility = "visible";
         el.style.opacity = String(op);
         el.style.zIndex = String(Math.round(z + 6000));
-        el.style.transform = `translate3d(${rx}px,${ry}px,${z}px) scale(${sc}) rotate(${rot}deg)`;
-        el.style.filter = blur > 0.4 ? `blur(${blur.toFixed(1)}px)` : "none";
-        el.style.cursor = "default";
+        el.style.transform = `translate3d(${rx}px,${ry}px,${z}px) scale(${finalScale}) rotate(${rot}deg)`;
+        el.style.filter = "none";
+        el.style.cursor = s.hoveredIndex === idx ? "pointer" : "default";
+        el.style.boxShadow = s.hoveredIndex === idx
+          ? "0 12px 40px rgba(0,0,0,0.18)"
+          : "0 8px 32px rgba(0,0,0,0.12)";
       });
     };
 
@@ -496,6 +510,7 @@ function DesktopView({ onAdd }: { onAdd: () => void }) {
     const tick = () => {
       s.panX += (s.tPanX - s.panX) * .10;
       s.panY += (s.tPanY - s.panY) * .10;
+      s.scrollZ += (s.targetScrollZ - s.scrollZ) * 0.08;
       if (s.mode === "scatter") drawScatter();
       s.rafId = requestAnimationFrame(tick);
     };
@@ -558,7 +573,7 @@ function DesktopView({ onAdd }: { onAdd: () => void }) {
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       if (s.mode === "card") { applyMode("scatter"); return; }
-      s.scrollZ += e.deltaY * 2.1;
+      s.targetScrollZ += e.deltaY * 2.1;
       if (!s.hintGone) { s.hintGone = true; setHintVisible(false); }
     };
 
@@ -578,7 +593,7 @@ function DesktopView({ onAdd }: { onAdd: () => void }) {
   }, []);
 
   return (
-    <div ref={wrapRef} className="relative w-full h-full overflow-hidden select-none" style={{ background: "#060606" }}>
+    <div ref={wrapRef} className="relative w-full h-full overflow-hidden select-none" style={{ background: "#ffffff" }}>
       {/* 3D stage */}
       <div className="absolute inset-0" style={{ perspective: "1000px", transformStyle: "preserve-3d" }}>
         <div ref={canvasRef} className="absolute inset-0" style={{ transformStyle: "preserve-3d" }} />
@@ -586,7 +601,7 @@ function DesktopView({ onAdd }: { onAdd: () => void }) {
 
       {/* Logo */}
       <div className="absolute top-4 left-5 pointer-events-none z-10"
-        style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, fontFamily: "Inter,sans-serif", fontWeight: 500, letterSpacing: ".04em" }}>
+        style={{ color: "rgba(17,17,17,0.4)", fontSize: 12, fontFamily: "Inter,sans-serif", fontWeight: 500, letterSpacing: ".04em" }}>
         Drops ✦
       </div>
 
@@ -595,7 +610,7 @@ function DesktopView({ onAdd }: { onAdd: () => void }) {
         className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-none whitespace-nowrap z-10 transition-opacity duration-700"
         style={{
           opacity: hintVisible ? 1 : 0,
-          color: "rgba(255,255,255,0.22)", fontSize: 10,
+          color: "rgba(17,17,17,0.22)", fontSize: 10,
           fontFamily: "Inter,sans-serif", letterSpacing: ".12em", textTransform: "uppercase",
         }}>
         scroll · hold & drag
@@ -603,14 +618,14 @@ function DesktopView({ onAdd }: { onAdd: () => void }) {
 
       {/* Mode label */}
       <div className="absolute top-4 right-5 pointer-events-none z-10"
-        style={{ color: "rgba(255,255,255,0.22)", fontSize: 10, fontFamily: "Inter,sans-serif", letterSpacing: ".1em", textTransform: "uppercase" }}>
+        style={{ color: "rgba(17,17,17,0.22)", fontSize: 10, fontFamily: "Inter,sans-serif", letterSpacing: ".1em", textTransform: "uppercase" }}>
         {mode}
       </div>
 
       {/* Counter (card mode) */}
       {mode === "card" && (
         <div className="absolute bottom-20 left-1/2 -translate-x-1/2 pointer-events-none whitespace-nowrap z-10"
-          style={{ color: "rgba(255,255,255,0.25)", fontSize: 10, fontFamily: "Inter,sans-serif" }}>
+          style={{ color: "rgba(17,17,17,0.25)", fontSize: 10, fontFamily: "Inter,sans-serif" }}>
           {counter} of {CARDS_DATA.length}
         </div>
       )}
@@ -623,9 +638,9 @@ function DesktopView({ onAdd }: { onAdd: () => void }) {
             onClick={() => setModeRef.current(m)}
             className="h-[38px] rounded-full border px-4 text-[11px] tracking-[.05em] transition-all"
             style={{
-              background: mode === m ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.07)",
-              borderColor: mode === m ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.12)",
-              color: mode === m ? "#fff" : "rgba(255,255,255,0.55)",
+              background: mode === m ? "rgba(17,17,17,0.12)" : "rgba(17,17,17,0.05)",
+              borderColor: mode === m ? "rgba(17,17,17,0.25)" : "rgba(17,17,17,0.1)",
+              color: mode === m ? "#111" : "rgba(17,17,17,0.5)",
               fontFamily: "Inter,sans-serif",
               backdropFilter: "blur(10px)",
             }}>
@@ -639,11 +654,11 @@ function DesktopView({ onAdd }: { onAdd: () => void }) {
         onClick={onAdd}
         className="absolute bottom-5 right-5 w-12 h-12 rounded-full flex items-center justify-center z-[100] transition-transform hover:scale-110 active:scale-95"
         style={{
-          background: "rgba(255,255,255,0.1)",
-          border: "1px solid rgba(255,255,255,0.18)",
+          background: "rgba(17,17,17,0.08)",
+          border: "1px solid rgba(17,17,17,0.15)",
           backdropFilter: "blur(12px)",
         }}>
-        <Plus size={18} color="#fff" />
+        <Plus size={18} color="#111" />
       </button>
     </div>
   );
@@ -659,6 +674,30 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
   const [flyingOut, setFlyingOut] = useState(false);
   const [scattering, setScattering] = useState(false);
 
+  // pinch state
+  const [scatterScale, setScatterScale] = useState(1);
+  const pinchStartDistanceRef = useRef<number | null>(null);
+  const pinchStartScaleRef = useRef(1);
+  const pinchTriggeredRef = useRef(false);
+
+  // gyro
+  const gyro = useGyroTilt();
+
+  // viewport dimensions for centered layout
+  const vpRef = useRef({ w: window.innerWidth, h: window.innerHeight });
+  const [vp, setVp] = useState({ w: window.innerWidth, h: window.innerHeight });
+
+  useEffect(() => {
+    const onResize = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      vpRef.current = { w, h };
+      setVp({ w, h });
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   const drag = useRef({ active: false, startX: 0 });
   const tap = useRef({ count: 0, timer: null as ReturnType<typeof setTimeout> | null });
   const pan = useRef({ active: false, lastX: 0 });
@@ -668,9 +707,11 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
       setScattering(true);
       setMode("scatter");
       setPanX(0);
+      setScatterScale(1);
       setTimeout(() => setScattering(false), 700);
     } else {
       setMode("stack");
+      setScatterScale(1);
       setCurrent(0);
     }
   };
@@ -683,6 +724,84 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
       if (t.count >= 2) toggleMode();
       t.count = 0;
     }, 280);
+  };
+
+  // ── Pinch gesture ──
+  function getTouchDistance(touches: TouchList) {
+    const [a, b] = [touches[0], touches[1]];
+    const dx = a.clientX - b.clientX;
+    const dy = a.clientY - b.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      pinchStartDistanceRef.current = getTouchDistance(e.touches);
+      pinchStartScaleRef.current = scatterScale;
+      pinchTriggeredRef.current = false;
+      return;
+    }
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchStartDistanceRef.current) {
+      const currentDistance = getTouchDistance(e.touches);
+      const diff = currentDistance - pinchStartDistanceRef.current;
+      if (mode === "stack") {
+        if (diff < -35 && !pinchTriggeredRef.current) {
+          pinchTriggeredRef.current = true;
+          setMode("scatter");
+          setScattering(true);
+          setPanX(0);
+          setTimeout(() => setScattering(false), 700);
+        }
+        return;
+      }
+      if (mode === "scatter") {
+        const nextScale = Math.min(
+          1.4,
+          Math.max(0.7, pinchStartScaleRef.current + diff / 300)
+        );
+        setScatterScale(nextScale);
+        if (diff > 35 && !pinchTriggeredRef.current) {
+          pinchTriggeredRef.current = true;
+          setMode("stack");
+          setScatterScale(1);
+          setCurrent(0);
+        }
+      }
+      return;
+    }
+    // existing pointer logic for single finger
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      if (mode === "scatter") {
+        pan.current = { active: true, lastX: touch.clientX };
+        return;
+      }
+      drag.current = { active: true, startX: touch.clientX };
+      setDragOffset(0);
+    }
+  };
+
+  const onTouchEnd = () => {
+    if (pinchStartDistanceRef.current !== null) {
+      pinchStartDistanceRef.current = null;
+      pinchTriggeredRef.current = false;
+    }
+    if (mode === "scatter") { pan.current.active = false; return; }
+    if (!drag.current.active) return;
+    drag.current.active = false;
+    if (Math.abs(dragOffset) > 95 && !flyingOut) {
+      setFlyingOut(true);
+      setTimeout(() => {
+        setCurrent(c => (c + 1) % CARDS_DATA.length);
+        setDragOffset(0);
+        setFlyingOut(false);
+      }, 360);
+    } else {
+      setDragOffset(0);
+    }
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -720,8 +839,8 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
   const getStyle = (i: number): React.CSSProperties => {
     const total = CARDS_DATA.length;
     const h = MOBILE_HEIGHTS[i];
-    const baseX = (PHONE_W - CARD_W) / 2;
-    const baseY = (PHONE_H - h) / 2 - 30;
+    const baseX = (vp.w - CARD_W) / 2;
+    const baseY = (vp.h - h) / 2 - 40;
     const card = CARDS_DATA[i];
 
     const base: React.CSSProperties = {
@@ -744,14 +863,21 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
         ...base,
         left: p.x,
         top: p.y,
-        transform: `translateX(${panX}px) rotate(${p.r}deg)`,
+        transform: `
+          translateX(${panX + gyro.offsetX}px)
+          translateY(${gyro.offsetY}px)
+          scale(${scatterScale})
+          rotate(${p.r}deg)
+        `,
+        transformOrigin: "center center",
         opacity: 1,
         zIndex: 10 + i,
         visibility: "visible",
         pointerEvents: "auto",
         transition: scattering
-          ? `top .5s cubic-bezier(.34,1.2,.64,1) ${i * 28}ms, left .5s cubic-bezier(.34,1.2,.64,1) ${i * 28}ms, opacity .4s ${i * 28}ms`
+          ? `transform 560ms cubic-bezier(.34,1.2,.64,1), opacity 420ms ease, left 560ms cubic-bezier(.34,1.2,.64,1), top 560ms cubic-bezier(.34,1.2,.64,1)`
           : "none",
+        transitionDelay: scattering ? `${i * 25}ms` : "0ms",
       };
     }
 
@@ -763,7 +889,14 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
       return {
         ...base,
         left: baseX, top: baseY,
-        transform: `translateX(${off}px) rotate(${rot}deg) scale(1)`,
+        transform: `
+          perspective(900px)
+          rotateX(${gyro.rotateX}deg)
+          rotateY(${gyro.rotateY}deg)
+          translateX(${off}px)
+          rotate(${rot}deg)
+          scale(1)
+        `,
         opacity: flyingOut ? 0 : 1,
         zIndex: 50,
         visibility: "visible",
@@ -773,14 +906,14 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
           : "none",
       };
     }
-    if (rel === 1) return { ...base, left: baseX, top: baseY + 14, transform: "rotate(2.5deg) scale(0.94)", opacity: .65, filter: "blur(0.5px)", zIndex: 40, visibility: "visible", pointerEvents: "none", transition: "transform .38s cubic-bezier(.34,1.2,.64,1), opacity .3s, top .38s, left .38s" };
-    if (rel === 2) return { ...base, left: baseX, top: baseY + 26, transform: "rotate(-1.5deg) scale(0.88)", opacity: .32, filter: "blur(1.5px)", zIndex: 30, visibility: "visible", pointerEvents: "none", transition: "transform .38s cubic-bezier(.34,1.2,.64,1), opacity .3s, top .38s, left .38s" };
-    if (rel === 3) return { ...base, left: baseX, top: baseY + 36, transform: "scale(0.82)", opacity: .12, filter: "blur(2px)", zIndex: 20, visibility: "visible", pointerEvents: "none", transition: "transform .38s, opacity .3s, top .38s, left .38s" };
+    if (rel === 1) return { ...base, left: baseX, top: baseY + 14, transform: "rotate(2.5deg) scale(0.94)", opacity: .65, filter: "blur(0.5px)", zIndex: 40, visibility: "visible", pointerEvents: "none", transition: "transform 560ms cubic-bezier(.34,1.2,.64,1), opacity 420ms ease, top 560ms cubic-bezier(.34,1.2,.64,1), left 560ms cubic-bezier(.34,1.2,.64,1)" };
+    if (rel === 2) return { ...base, left: baseX, top: baseY + 26, transform: "rotate(-1.5deg) scale(0.88)", opacity: .32, filter: "blur(1.5px)", zIndex: 30, visibility: "visible", pointerEvents: "none", transition: "transform 560ms cubic-bezier(.34,1.2,.64,1), opacity 420ms ease, top 560ms cubic-bezier(.34,1.2,.64,1), left 560ms cubic-bezier(.34,1.2,.64,1)" };
+    if (rel === 3) return { ...base, left: baseX, top: baseY + 36, transform: "scale(0.82)", opacity: .12, filter: "blur(2px)", zIndex: 20, visibility: "visible", pointerEvents: "none", transition: "transform 560ms, opacity 420ms ease, top 560ms, left 560ms" };
     return { ...base, visibility: "hidden", opacity: 0, zIndex: 5, pointerEvents: "none" };
   };
 
   return (
-    <div className="w-full h-full bg-white overflow-hidden relative select-none" style={{ fontFamily: "Inter,sans-serif" }}>
+    <div className="relative w-screen h-[100dvh] min-h-[100dvh] overflow-hidden bg-white select-none" style={{ fontFamily: "Inter,sans-serif" }}>
       {/* Topbar */}
       <div className="absolute top-0 left-0 right-0 flex justify-between items-center px-5 pt-4 z-[200] pointer-events-none">
         <span style={{ fontSize: 12, fontWeight: 500, color: "rgba(17,17,17,0.4)", letterSpacing: ".04em" }}>Drops ✦</span>
@@ -789,20 +922,25 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
 
       {/* Cards */}
       <div
-        className="absolute inset-0 overflow-hidden"
+        className="absolute inset-0 flex items-center justify-center pb-[88px]"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerUp}
         onPointerCancel={onPointerUp}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
         onClick={handleClick}
         style={{ touchAction: "none" }}
       >
-        {CARDS_DATA.map((card, i) => (
-          <div key={i} style={getStyle(i)}>
-            <CardFace quote={card.quote} handle={card.handle} bg={card.bg} />
-          </div>
-        ))}
+        <div className="relative flex h-[520px] w-full items-center justify-center">
+          {CARDS_DATA.map((card, i) => (
+            <div key={i} style={getStyle(i)}>
+              <CardFace quote={card.quote} handle={card.handle} bg={card.bg} />
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Counter */}
@@ -819,6 +957,16 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
           style={{ bottom: 74, left: "50%", transform: "translateX(-50%)", fontSize: 9, color: "#ccc", letterSpacing: ".04em", fontFamily: "Inter,sans-serif" }}>
           double tap to scatter
         </div>
+      )}
+
+      {/* Gyro permission */}
+      {mode === "stack" && !gyro.supported && (
+        <button
+          onClick={(e) => { e.stopPropagation(); gyro.requestPermission(); }}
+          className="absolute z-[100]"
+          style={{ bottom: 56, left: "50%", transform: "translateX(-50%)", fontSize: 9, color: "#bbb", fontFamily: "Inter,sans-serif", textDecoration: "underline" }}>
+          Enable motion
+        </button>
       )}
 
       {/* Leave your mark pill / FAB */}
@@ -844,17 +992,112 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
   );
 }
 
+// ── Desktop Card Gallery Modal ────────────────────────────────────────────────
+
+function CardGalleryModal({
+  card,
+  index,
+  total,
+  onClose,
+  onPrev,
+  onNext,
+}: {
+  card: typeof CARDS_DATA[0];
+  index: number;
+  total: number;
+  onClose: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[999] flex items-center justify-center bg-black/35"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-[min(440px,90vw)] rounded-[24px] bg-white p-4 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#111] shadow"
+          onClick={onClose}
+        >
+          ×
+        </button>
+        <button
+          className="absolute left-[-56px] top-1/2 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white text-[#111] shadow md:flex"
+          onClick={onPrev}
+        >
+          ‹
+        </button>
+        <button
+          className="absolute right-[-56px] top-1/2 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white text-[#111] shadow md:flex"
+          onClick={onNext}
+        >
+          ›
+        </button>
+        <div
+          className="relative flex h-[520px] flex-col justify-between overflow-hidden rounded-[20px] p-5"
+          style={{ background: card.bg, fontFamily: "Inter,sans-serif" }}
+        >
+          <div className="text-[10px] uppercase tracking-[0.14em] text-black/45">
+            CONFIG 2026
+          </div>
+          <div className="flex flex-1 items-center text-[28px] font-bold leading-tight"
+            style={{ color: card.bg === "#FFCD29" || card.bg === "#F5F0E8" ? "#111" : "#fff" }}>
+            {card.quote}
+          </div>
+          <div className="text-[13px] text-black/45">
+            {card.handle}
+          </div>
+        </div>
+        <div className="mt-4 flex items-center gap-2 text-sm">
+          <button className="rounded-full bg-black/5 px-3 py-1">❤️ 24</button>
+          <button className="rounded-full bg-black/5 px-3 py-1">🔥 12</button>
+          <button className="rounded-full bg-black/5 px-3 py-1">✨ 40</button>
+        </div>
+        <div className="mt-4 rounded-2xl bg-black/5 p-3">
+          <div className="text-xs text-black/40">Comments</div>
+          <div className="mt-2 text-sm text-black/70">
+            This was such a good moment.
+          </div>
+        </div>
+        <div className="mt-3 text-center text-xs text-black/30">
+          {index + 1} of {total}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 
 export default function App() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [showModal, setShowModal] = useState(false);
+  const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", h);
     return () => window.removeEventListener("resize", h);
   }, []);
+
+  // keyboard navigation for gallery modal
+  useEffect(() => {
+    if (selectedCardIndex === null) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedCardIndex(null);
+      if (e.key === "ArrowRight") {
+        setSelectedCardIndex(i => i !== null ? (i + 1) % CARDS_DATA.length : null);
+      }
+      if (e.key === "ArrowLeft") {
+        setSelectedCardIndex(i => i !== null ? (i - 1 + CARDS_DATA.length) % CARDS_DATA.length : null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedCardIndex]);
 
   const handlePost = (_card: NewCard) => {
     // would push to wall data
@@ -864,7 +1107,7 @@ export default function App() {
     <div className="w-full h-full" style={{ fontFamily: "Inter, sans-serif" }}>
       {isMobile
         ? <MobileView onAdd={() => setShowModal(true)} />
-        : <DesktopView onAdd={() => setShowModal(true)} />
+        : <DesktopView onAdd={() => setShowModal(true)} onCardSelect={(i) => setSelectedCardIndex(i)} />
       }
 
       <AnimatePresence>
@@ -872,6 +1115,17 @@ export default function App() {
           <CardModal onClose={() => setShowModal(false)} onPost={handlePost} />
         )}
       </AnimatePresence>
+
+      {selectedCardIndex !== null && (
+        <CardGalleryModal
+          card={CARDS_DATA[selectedCardIndex]}
+          index={selectedCardIndex}
+          total={CARDS_DATA.length}
+          onClose={() => setSelectedCardIndex(null)}
+          onPrev={() => setSelectedCardIndex(i => i !== null ? (i - 1 + CARDS_DATA.length) % CARDS_DATA.length : null)}
+          onNext={() => setSelectedCardIndex(i => i !== null ? (i + 1) % CARDS_DATA.length : null)}
+        />
+      )}
     </div>
   );
 }

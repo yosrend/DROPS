@@ -18,6 +18,18 @@ const CARDS_DATA = [
   { bg: "#FFCD29", quote: "First Config. Not the last.", handle: "@alex" },
   { bg: "#7B61FF", quote: "Drop your card.", handle: "@drops" },
   { bg: "#F24822", quote: "Config 2025 — we were here.", handle: "@wei" },
+  { bg: "#1ABCFE", quote: "Infinite possibilities.", handle: "@aisha" },
+  { bg: "#F5F0E8", quote: "The future is collaborative.", handle: "@marcus" },
+  { bg: "#7B61FF", quote: "Pixel perfect, every time.", handle: "@leena" },
+  { bg: "#111111", quote: "Design without borders.", handle: "@raj" },
+  { bg: "#FFCD29", quote: "Keep building.", handle: "@taylor" },
+  { bg: "#F24822", quote: "Bold moves only.", handle: "@jordan" },
+  { bg: "#1ABCFE", quote: "Ship fast, ship often.", handle: "@sam" },
+  { bg: "#7B61FF", quote: "Collaboration is magic.", handle: "@emma" },
+  { bg: "#111111", quote: "Less talk, more design.", handle: "@noah" },
+  { bg: "#FFCD29", quote: "Dream big. Build bigger.", handle: "@mia" },
+  { bg: "#F5F0E8", quote: "Innovate or stagnate.", handle: "@liam" },
+  { bg: "#F24822", quote: "Break things. Fix them.", handle: "@zoe" },
 ];
 
 const CARD_STYLES = [
@@ -46,7 +58,7 @@ const POS: [number, number][] = [
   [.38, .55], [.20, .48], [.55, .68], [.75, .62], [.35, .35],
 ];
 
-const ROTS = [-3, 2, -5, 4, -2, 6, -4, 3, -6, 2, -3, 5, 1, -4, 3, -2, 4, -5, 2, -3, 5, -1, 3, -4, 2];
+const ROTS = Array(25).fill(0);
 const LAYERS = 5;
 const DEPTH = 900;
 
@@ -60,7 +72,7 @@ function blurAmt(z: number) {
 
 // ── mobile layout constants ───────────────────────────────────────────────────
 
-const MOBILE_HEIGHTS = [400, 380, 420, 360, 370, 390, 375, 410, 385, 360, 395, 370];
+const MOBILE_HEIGHTS = [400, 380, 420, 360, 370, 390, 375, 410, 385, 360, 395, 370, 405, 375, 415, 365, 380, 395, 400, 370, 385, 410, 390, 360];
 const CARD_W = 290;
 const PHONE_W = 390;
 const PHONE_H = 640;
@@ -70,6 +82,10 @@ const SCATTER_POS = [
   { x: 200, y: 180, r: 7 }, { x: 30, y: 380, r: -4 }, { x: 220, y: 340, r: 8 },
   { x: -10, y: 490, r: -5 }, { x: 190, y: 480, r: 4 }, { x: 80, y: 130, r: 6 },
   { x: 150, y: 280, r: -3 }, { x: 50, y: 300, r: 5 }, { x: 240, y: 120, r: -7 },
+  { x: 20, y: 160, r: 3 }, { x: 210, y: 260, r: -4 }, { x: 0, y: 350, r: 6 },
+  { x: 170, y: 420, r: -2 }, { x: 60, y: 200, r: -5 }, { x: 230, y: 400, r: 3 },
+  { x: -30, y: 130, r: 7 }, { x: 120, y: 450, r: -6 }, { x: 250, y: 200, r: 4 },
+  { x: 40, y: 100, r: -3 }, { x: 160, y: 360, r: 2 }, { x: 100, y: 250, r: -1 },
 ];
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -365,8 +381,8 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
   // ── spacing / zoom controls ──
   const [showControls, setShowControls] = useState(false);
   const [spread, setSpread] = useState(0.6);
-  const [depthGap, setDepthGap] = useState(500);
-  const [zoom, setZoom] = useState(1.2);
+  const [depthGap, setDepthGap] = useState(200);
+  const [zoom, setZoom] = useState(1.45);
   const spreadRef = useRef(spread);
   const depthGapRef = useRef(depthGap);
   const zoomRef = useRef(zoom);
@@ -406,7 +422,8 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
       el: HTMLDivElement;
       bx: number; by: number; bz: number; rot: number;
       w: number; h: number; bg: string;
-      nx: number; ny: number; // normalized POS (0-1)
+      nx: number; ny: number;
+      isCenter: boolean;
     };
 
     const cards: TCard[] = [];
@@ -431,24 +448,30 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
         const textColor = light ? "rgba(17,17,17,0.9)" : "#fff";
         const mutedColor = light ? "rgba(17,17,17,0.4)" : "rgba(255,255,255,0.45)";
 
-        const el = document.createElement("div");
-        el.style.cssText = `position:absolute;border-radius:20px;overflow:hidden;user-select:none;will-change:transform,filter,opacity;backface-visibility:hidden;display:flex;flex-direction:column;justify-content:space-between;width:${w}px;height:${h}px;background:${data.bg};left:${bx}px;top:${by}px;box-shadow:0 8px 32px rgba(0,0,0,0.35);font-family:Inter,sans-serif;`;
-        el.innerHTML = `
-          <div style="font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:${mutedColor};font-weight:500;padding:14px 14px 0">Config 2025</div>
-          <div style="font-size:14px;font-weight:700;color:${textColor};line-height:1.3;padding:8px 14px;flex:1;display:flex;align-items:center">${data.quote}</div>
-          <div style="font-size:10px;color:${mutedColor};padding:0 14px 14px">${data.handle}</div>
-          <div style="position:absolute;top:12px;right:12px;width:5px;height:5px;border-radius:50%;background:${light ? "rgba(17,17,17,0.25)" : "rgba(255,255,255,0.6)"}"></div>
-        `;
-        el.dataset.cardIndex = String(cards.length);
-        el.addEventListener("mouseenter", () => { s.hoveredIndex = cards.length; });
-        el.addEventListener("mouseleave", () => { s.hoveredIndex = null; });
-        el.addEventListener("click", () => {
-          if (s.mode === "scatter") {
-            onCardSelect(cards.length % CARDS_DATA.length);
-          }
+        // create 9 mirror copies (3×3 grid) for infinite pan
+        const logicalIdx = l * CARDS_DATA.length + i;
+        [-vw, 0, vw].forEach((xOff) => {
+          [-vh, 0, vh].forEach((yOff) => {
+            const el = document.createElement("div");
+            el.style.cssText = `position:absolute;border-radius:20px;overflow:hidden;user-select:none;will-change:transform,filter,opacity;backface-visibility:hidden;display:flex;flex-direction:column;justify-content:space-between;width:${w}px;height:${h}px;background:${data.bg};left:${bx + xOff}px;top:${by + yOff}px;box-shadow:0 8px 32px rgba(0,0,0,0.35);font-family:Inter,sans-serif;`;
+            el.innerHTML = `
+              <div style="font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:${mutedColor};font-weight:500;padding:14px 14px 0">Config 2025</div>
+              <div style="font-size:14px;font-weight:700;color:${textColor};line-height:1.3;padding:8px 14px;flex:1;display:flex;align-items:center">${data.quote}</div>
+              <div style="font-size:10px;color:${mutedColor};padding:0 14px 14px">${data.handle}</div>
+              <div style="position:absolute;top:12px;right:12px;width:5px;height:5px;border-radius:50%;background:${light ? "rgba(17,17,17,0.25)" : "rgba(255,255,255,0.6)"}"></div>
+            `;
+            el.dataset.cardIndex = String(logicalIdx);
+            el.addEventListener("mouseenter", () => { s.hoveredIndex = logicalIdx; });
+            el.addEventListener("mouseleave", () => { s.hoveredIndex = null; });
+            el.addEventListener("click", () => {
+              if (s.mode === "scatter") {
+                onCardSelect(logicalIdx % CARDS_DATA.length);
+              }
+            });
+            canvas.appendChild(el);
+            cards.push({ el, bx: bx + xOff, by: by + yOff, bz, rot, w, h, bg: data.bg, nx: px, ny: py, isCenter: xOff === 0 && yOff === 0 });
+          });
         });
-        canvas.appendChild(el);
-        cards.push({ el, bx, by, bz, rot, w, h, bg: data.bg, nx: px, ny: py });
       }
     }
 
@@ -464,7 +487,7 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
         const spPy = (ny - s.cy) * sp + s.cy;
         const cBx = spPx * vw - w / 2;
         const cBy = spPy * vh - h / 2;
-        const layer = Math.floor(idx / CARDS_DATA.length);
+        const layer = Math.floor(idx / (CARDS_DATA.length * 9));
         const cBz = -layer * dg;
         const rx = cBx + s.panX;
         const ry = cBy + s.panY;
@@ -492,14 +515,16 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
     };
 
     const drawCard = () => {
-      const total = cards.length;
+      const centers = cards.filter(c => c.isCenter);
+      const total = centers.length;
       const idx = s.cardIdx;
-      cards.forEach((c, i) => {
+      // hide all, then show relevant center copies
+      cards.forEach(c => { c.el.style.visibility = "hidden"; c.el.style.opacity = "0"; });
+      centers.forEach((c, i) => {
         const rel = ((i - idx) % total + total) % total;
         const el = c.el;
         const cx = vw / 2 - c.w / 2;
         const cy = vh / 2 - c.h / 2 - 20;
-        el.style.filter = "none";
         if (rel === 0) {
           el.style.visibility = "visible";
           el.style.transition = "transform .4s cubic-bezier(.34,1.2,.64,1),opacity .3s,filter .3s,left .4s,top .4s";
@@ -544,7 +569,7 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
     const tick = () => {
       s.panX += (s.tPanX - s.panX) * .10;
       s.panY += (s.tPanY - s.panY) * .10;
-      s.scrollZ += (s.targetScrollZ - s.scrollZ) * 0.08;
+      s.scrollZ += (s.targetScrollZ - s.scrollZ) * 0.04;
       if (s.mode === "scatter") drawScatter();
       s.rafId = requestAnimationFrame(tick);
     };
@@ -555,8 +580,9 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
       if ((e.target as HTMLElement).closest("button")) return;
       if (s.mode === "card") {
         s.dragging = true; s.dragStartX = e.clientX; s.dragCurX = 0;
-        const top = cards[s.cardIdx % cards.length];
-        top.el.style.transition = "none";
+        const centers = cards.filter(c => c.isCenter);
+        const top = centers[s.cardIdx % centers.length];
+        if (top) top.el.style.transition = "none";
         return;
       }
       s.isDown = true; s.lmx = e.clientX; s.lmy = e.clientY;
@@ -567,12 +593,14 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
     const onMove = (e: MouseEvent) => {
       if (s.mode === "card" && s.dragging) {
         s.dragCurX = e.clientX - s.dragStartX;
-        const top = cards[s.cardIdx % cards.length];
-        const cx = vw / 2 - top.w / 2;
-        const cy = vh / 2 - top.h / 2 - 20;
-        const rot = s.dragCurX * 0.06;
-        top.el.style.transform = `translate3d(${s.dragCurX}px,${Math.abs(s.dragCurX) * .05}px,0) rotate(${rot}deg) scale(1)`;
-        top.el.style.left = cx + "px"; top.el.style.top = cy + "px";
+        const centers = cards.filter(c => c.isCenter);
+        const top = centers[s.cardIdx % centers.length];
+        if (top) {
+          const cx = vw / 2 - top.w / 2;
+          const cy = vh / 2 - top.h / 2 - 20;
+          const rot = s.dragCurX * 0.06;
+          top.el.style.transform = `translate3d(${s.dragCurX}px,${Math.abs(s.dragCurX) * .05}px,0) rotate(${rot}deg) scale(1)`;
+        }
         return;
       }
       if (!s.isDown || !s.holdActive) return;
@@ -583,14 +611,17 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
     const onUp = () => {
       if (s.mode === "card" && s.dragging) {
         s.dragging = false;
+        const centers = cards.filter(c => c.isCenter);
         if (Math.abs(s.dragCurX) > 90) {
-          const top = cards[s.cardIdx % cards.length];
+          const top = centers[s.cardIdx % centers.length];
           const dir = s.dragCurX > 0 ? 1 : -1;
-          top.el.style.transition = "transform .35s cubic-bezier(.55,.06,.68,.19),opacity .3s";
-          top.el.style.transform = `translateX(${dir * 500}px) rotate(${dir * 20}deg) scale(0.9)`;
-          top.el.style.opacity = "0";
+          if (top) {
+            top.el.style.transition = "transform .35s cubic-bezier(.55,.06,.68,.19),opacity .3s";
+            top.el.style.transform = `translateX(${dir * 500}px) rotate(${dir * 20}deg) scale(0.9)`;
+            top.el.style.opacity = "0";
+          }
           setTimeout(() => {
-            s.cardIdx = (s.cardIdx + 1) % cards.length;
+            s.cardIdx = (s.cardIdx + 1) % centers.length;
             setCounter(s.cardIdx + 1);
             drawCard();
           }, 380);

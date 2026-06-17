@@ -903,7 +903,7 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
       const currentDist = getTouchDistance(e.touches);
       const diff = currentDist - pinchStartDistanceRef.current;
       if (mode === "stack") {
-        if (diff < -35 && !pinchTriggeredRef.current) {
+        if (diff < -20 && !pinchTriggeredRef.current) {
           pinchTriggeredRef.current = true;
           setMode("scatter");
           setScattering(true);
@@ -915,7 +915,7 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
       if (mode === "scatter") {
         const nextScale = Math.min(1.4, Math.max(0.7, pinchStartScaleRef.current + diff / 300));
         setScatterScale(nextScale);
-        if (diff > 35 && !pinchTriggeredRef.current) {
+        if (diff > 20 && !pinchTriggeredRef.current) {
           pinchTriggeredRef.current = true;
           setMode("stack");
           setScatterScale(1);

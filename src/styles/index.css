@@ -10,6 +10,11 @@ html, body, #root {
 
 .dotted-bg {
   background-color: #FFFDF7;
-  background-image: radial-gradient(circle, #e5e0d8 1px, transparent 1px);
-  background-size: 20px 20px;
+  background-image: radial-gradient(circle, #e5e0d8 1px, transparent 1px),
+    radial-gradient(ellipse at 20% 50%, rgba(123,97,255,0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(30,172,254,0.03) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(255,205,41,0.03) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 70%, rgba(242,72,34,0.03) 0%, transparent 50%);
+  background-size: 20px 20px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
 }

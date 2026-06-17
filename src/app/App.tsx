@@ -4,9 +4,10 @@ import { motion, AnimatePresence } from "motion/react";
 import { useGyroTilt } from "../hooks/useGyroTilt";
 import Onboarding from "./components/Onboarding";
 import AddCardModal from "./components/AddCardModal";
+import AdminPanel from "./components/AdminPanel";
 import { CardFace } from "./components/CardFace";
 import { ONBOARDING_KEY, CARDS_KEY, type UserCard } from "./data/defaults";
-import { getDrops, createDrop } from "../services/dropsService";
+import { getDrops, createDrop, toggleLike, getLikes, addReaction, getReactions, addComment, getComments, shareDropLink, shareWallLink } from "../services/dropsService";
 import { getDeviceId } from "../utils/device";
 
 // ── data ─────────────────────────────────────────────────────────────────────
@@ -423,6 +424,14 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
         <Plus size={18} color="#fff" />
         Drop your card
       </button>
+
+      {/* Admin & Animate links */}
+      <div className="absolute top-4 right-5 flex gap-2 z-[999]">
+        <button onClick={() => window.location.hash = "admin"}
+          className="text-[10px] text-[rgba(17,17,17,0.25)] hover:text-[rgba(17,17,17,0.5)] transition-colors underline">
+          Admin
+        </button>
+      </div>
     </div>
   );
 }
@@ -946,66 +955,173 @@ function CardGalleryModal({
   onPrev,
   onNext,
 }: {
-  card: typeof CARDS_DATA[0];
+  card: any;
   index: number;
   total: number;
   onClose: () => void;
   onPrev: () => void;
   onNext: () => void;
 }) {
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [reactions, setReactions] = useState<string[]>([]);
+  const [comments, setComments] = useState<any[]>([]);
+  const [commentText, setCommentText] = useState("");
+  const [toast, setToast] = useState("");
+  const [floatingEmoji, setFloatingEmoji] = useState<string | null>(null);
+  const did = getDeviceId();
+
+  // load social data
+  useEffect(() => {
+    if (!card?.id) return;
+    const load = async () => {
+      const likes = await toggleLike(card.id, did);
+      setLiked(false); setLikeCount(0); // reset — toggleLike was called check-only
+      const [l, r, cm] = await Promise.all([
+        getDrops ? Promise.resolve(0) : Promise.resolve(0),
+        getReactions(card.id),
+        getComments(card.id),
+      ]);
+      const allLikes = await getLikes(card.id);
+      setLikeCount(allLikes);
+      setComments(cm);
+    };
+    load();
+  }, [card?.id]);
+
+  const handleLike = async () => {
+    if (!card?.id) return;
+    const res = await toggleLike(card.id, did);
+    setLiked(res.liked);
+    setLikeCount(res.count);
+  };
+
+  const handleReaction = async (emoji: string) => {
+    if (!card?.id) return;
+    await addReaction(card.id, did, emoji);
+    setFloatingEmoji(emoji);
+    setTimeout(() => setFloatingEmoji(null), 1200);
+    setReactions(prev => [...prev, emoji]);
+  };
+
+  const handleComment = async () => {
+    if (!card?.id || !commentText.trim()) return;
+    const c = await addComment(card.id, did, "", commentText.trim());
+    setComments(prev => [c, ...prev]);
+    setCommentText("");
+    setToast("Comment posted ✓");
+    setTimeout(() => setToast(""), 2000);
+  };
+
+  const handleShare = () => {
+    if (card?.id) shareDropLink(card.id);
+    else shareWallLink();
+    setToast("Link copied ✦");
+    setTimeout(() => setToast(""), 2000);
+  };
+
+  const isLight = card?.bg === "#FFCD29" || card?.bg === "#F5F0E8";
+
   return (
-    <div
-      className="fixed inset-0 z-[999] flex items-center justify-center bg-black/35"
-      onClick={onClose}
-    >
-      <div
-        className="relative w-[min(440px,90vw)] rounded-[14px] bg-white p-4 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#111] shadow"
-          onClick={onClose}
-        >
-          ×
-        </button>
-        <button
-          className="absolute left-[-56px] top-1/2 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white text-[#111] shadow md:flex"
-          onClick={onPrev}
-        >
-          ‹
-        </button>
-        <button
-          className="absolute right-[-56px] top-1/2 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white text-[#111] shadow md:flex"
-          onClick={onNext}
-        >
-          ›
-        </button>
-        <div
-          className="relative flex h-[520px] flex-col justify-between overflow-hidden rounded-[20px] p-5"
-          style={{ background: card.bg, fontFamily: "Inter,sans-serif" }}
-        >
-          <div className="flex flex-1 items-center text-[28px] font-bold leading-tight"
-            style={{ color: card.bg === "#FFCD29" || card.bg === "#F5F0E8" ? "#111" : "#fff" }}>
-            {card.quote}
-          </div>
-          <div className="text-[13px] text-black/45">
-            {card.handle}
+    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/35" onClick={onClose}>
+      <div className="relative w-[min(440px,90vw)] rounded-[14px] bg-white shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        {/* Close */}
+        <button className="absolute right-3 top-3 z-10 w-8 h-8 rounded-full bg-white/80 flex items-center justify-center shadow" onClick={onClose}>×</button>
+        {/* Prev/Next */}
+        <button className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white/80 flex items-center justify-center shadow hidden md:flex" onClick={onPrev}>‹</button>
+        <button className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white/80 flex items-center justify-center shadow hidden md:flex" onClick={onNext}>›</button>
+
+        {/* Card visual */}
+        <div className="p-4 pb-0">
+          <div className="relative flex h-[340px] flex-col justify-between overflow-hidden rounded-[14px] p-5"
+            style={{ background: card?.bg || "#7B61FF", fontFamily: "Inter,sans-serif" }}>
+            <div className="flex flex-1 items-center text-[22px] font-bold leading-tight"
+              style={{ color: isLight ? "#111" : "#fff" }}>
+              {card?.quote || ""}
+            </div>
+            <div className="flex justify-between items-end">
+              <div className="text-[12px]" style={{ color: isLight ? "rgba(17,17,17,0.45)" : "rgba(255,255,255,0.45)" }}>
+                {card?.handle || ""}
+              </div>
+              {card?.userName && (
+                <div className="text-[10px] text-right" style={{ color: isLight ? "rgba(17,17,17,0.3)" : "rgba(255,255,255,0.3)" }}>
+                  {card.userName}{card.userRole ? ` · ${card.userRole}` : ""}
+                </div>
+              )}
+            </div>
           </div>
         </div>
-        <div className="mt-4 flex items-center gap-2 text-sm">
-          <button className="rounded-full bg-black/5 px-3 py-1">❤️ 24</button>
-          <button className="rounded-full bg-black/5 px-3 py-1">🔥 12</button>
-          <button className="rounded-full bg-black/5 px-3 py-1">✨ 40</button>
+
+        {/* Social bar */}
+        <div className="px-4 pt-3 flex items-center gap-3 text-sm">
+          {/* Like */}
+          <button onClick={handleLike} className="flex items-center gap-1 transition-transform active:scale-125"
+            style={{ color: liked ? "#F24822" : "rgba(17,17,17,0.4)" }}>
+            {liked ? "❤️" : "🤍"} <span className="text-xs">{likeCount}</span>
+          </button>
+          {/* Emoji reactions */}
+          {["🔥", "✨", "💜", "😂", "🙌"].map(e => (
+            <button key={e} onClick={() => handleReaction(e)}
+              className="transition-transform hover:scale-125 active:scale-150 text-sm">{e}</button>
+          ))}
+          {/* Share */}
+          <button onClick={handleShare} className="ml-auto text-xs text-[rgba(17,17,17,0.35)] underline">Share</button>
         </div>
-        <div className="mt-4 rounded-2xl bg-black/5 p-3">
-          <div className="text-xs text-black/40">Comments</div>
-          <div className="mt-2 text-sm text-black/70">
-            This was such a good moment.
+
+        {/* Floating emoji animation */}
+        {floatingEmoji && (
+          <div className="absolute pointer-events-none text-xl z-20"
+            style={{
+              left: "50%", top: "40%",
+              animation: "none",
+              transform: "translateX(-50%)",
+            }}>
+            <motion.div
+              initial={{ y: 0, opacity: 1, scale: 1 }}
+              animate={{ y: -60, opacity: 0, scale: 1.5 }}
+              transition={{ duration: 1, ease: "easeOut" }}
+            >{floatingEmoji}</motion.div>
+          </div>
+        )}
+
+        {/* Comments */}
+        <div className="px-4 pt-3 pb-2">
+          <div className="flex gap-2">
+            <input value={commentText} onChange={e => setCommentText(e.target.value)}
+              placeholder="Add a comment…" maxLength={120}
+              className="flex-1 h-9 rounded-xl px-3 text-xs outline-none bg-[rgba(17,17,17,0.05)] text-[#111] placeholder:text-[rgba(17,17,17,0.25)]"
+              onKeyDown={e => { if (e.key === "Enter") handleComment(); }}
+            />
+            <button onClick={handleComment} disabled={!commentText.trim()}
+              className="px-3 h-9 rounded-xl text-xs font-medium"
+              style={{ background: commentText.trim() ? "#7B61FF" : "rgba(17,17,17,0.08)", color: commentText.trim() ? "#fff" : "rgba(17,17,17,0.3)" }}>
+              Post
+            </button>
           </div>
         </div>
-        <div className="mt-3 text-center text-xs text-black/30">
-          {index + 1} of {total}
-        </div>
+
+        {/* Comments list */}
+        {comments.length > 0 && (
+          <div className="px-4 pb-3 max-h-[120px] overflow-y-auto space-y-1.5">
+            {comments.slice(0, 5).map(c => (
+              <div key={c.id} className="text-xs text-[rgba(17,17,17,0.6)]">
+                <span className="font-medium text-[rgba(17,17,17,0.8)]">{c.authorName || "Anonymous"}</span>
+                <span className="ml-1">{c.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Counter */}
+        <div className="pb-3 text-center text-[10px] text-[rgba(17,17,17,0.25)]">{index + 1} of {total}</div>
+
+        {/* Toast */}
+        {toast && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-[#111] text-white text-xs shadow">
+            {toast}
+          </motion.div>
+        )}
       </div>
     </div>
   );
@@ -1020,6 +1136,7 @@ export default function App() {
 
   // onboarding gate
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem(ONBOARDING_KEY) === "true");
+  const [animated, setAnimated] = useState(() => localStorage.getItem("drops_animated") === "true");
 
   // card state
   const [userCards, setUserCards] = useState<UserCard[]>([]);
@@ -1060,10 +1177,13 @@ export default function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedCardIndex, remoteCards.length, userCards.length]);
 
-  const combinedCards = [...CARDS_DATA, ...remoteCards, ...userCards].map(u => ({
+  const combinedCards = [...CARDS_DATA, ...remoteCards, ...userCards].map((u, idx) => ({
     bg: u.bg,
     quote: u.type === "sticker" ? u.stickerLabel || u.quote : u.quote,
     handle: u.handle,
+    id: (u as any).id || `seed-${idx}`,
+    userName: (u as any).userName,
+    userRole: (u as any).userRole,
   }));
 
   const handlePost = async (card: UserCard) => {
@@ -1095,7 +1215,11 @@ export default function App() {
     }
   };
 
-  // onboarding
+  // onboarding gate — must check before admin
+  const isAdmin = typeof window !== "undefined" && window.location.hash === "#admin";
+  if (isAdmin) {
+    return <AdminPanel onClose={() => { window.location.hash = ""; }} />;
+  }
   if (!onboarded) {
     return <Onboarding onComplete={() => setOnboarded(true)} />;
   }

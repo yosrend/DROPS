@@ -195,6 +195,103 @@ function mapPostsToCards(posts: DropPost[]): UserCard[] {
   return posts.map(mapPostToCard);
 }
 
+// ── Social ──
+
+const LIKES_KEY = "drops_likes";
+const REACTIONS_KEY = "drops_reactions";
+const COMMENTS_KEY = "drops_comments";
+
+interface LikeRecord { dropId: string; deviceId: string; }
+interface ReactionRecord { dropId: string; deviceId: string; emoji: string; createdAt: string; }
+export interface CommentRecord { id: string; dropId: string; deviceId: string; authorName: string; text: string; createdAt: string; isHidden: boolean; }
+
+function getLikesStorage(): LikeRecord[] {
+  try { return JSON.parse(localStorage.getItem(LIKES_KEY) || "[]"); } catch { return []; }
+}
+function setLikesStorage(data: LikeRecord[]) { localStorage.setItem(LIKES_KEY, JSON.stringify(data)); }
+function getReactionsStorage(): ReactionRecord[] {
+  try { return JSON.parse(localStorage.getItem(REACTIONS_KEY) || "[]"); } catch { return []; }
+}
+function setReactionsStorage(data: ReactionRecord[]) { localStorage.setItem(REACTIONS_KEY, JSON.stringify(data)); }
+function getCommentsStorage(): CommentRecord[] {
+  try { return JSON.parse(localStorage.getItem(COMMENTS_KEY) || "[]"); } catch { return []; }
+}
+function setCommentsStorage(data: CommentRecord[]) { localStorage.setItem(COMMENTS_KEY, JSON.stringify(data)); }
+
+export async function toggleLike(dropId: string, deviceId: string): Promise<{ liked: boolean; count: number }> {
+  const sb = await getSupabase();
+  if (sb) {
+    try { /* would call Supabase likes table */ } catch {}
+  }
+  // localStorage fallback
+  const likes = getLikesStorage();
+  const existing = likes.findIndex(l => l.dropId === dropId && l.deviceId === deviceId);
+  let updated: LikeRecord[];
+  if (existing >= 0) { updated = likes.filter((_, i) => i !== existing); }
+  else { updated = [...likes, { dropId, deviceId }]; }
+  setLikesStorage(updated);
+  return { liked: existing < 0, count: updated.filter(l => l.dropId === dropId).length };
+}
+
+export async function getLikes(dropId: string): Promise<number> {
+  return getLikesStorage().filter(l => l.dropId === dropId).length;
+}
+
+export async function addReaction(dropId: string, deviceId: string, emoji: string): Promise<void> {
+  const sb = await getSupabase();
+  if (sb) { try {} catch {} }
+  const reactions = getReactionsStorage();
+  // remove existing reaction from same device (toggle off)
+  const filtered = reactions.filter(r => !(r.dropId === dropId && r.deviceId === r.deviceId));
+  setReactionsStorage([...filtered, { dropId, deviceId, emoji, createdAt: new Date().toISOString() }]);
+}
+
+export async function getReactions(dropId: string): Promise<ReactionRecord[]> {
+  return getReactionsStorage().filter(r => r.dropId === dropId);
+}
+
+export async function addComment(dropId: string, deviceId: string, authorName: string, text: string): Promise<CommentRecord> {
+  const comment: CommentRecord = {
+    id: crypto.randomUUID?.() || Date.now().toString(36),
+    dropId, deviceId, authorName: authorName || "Anonymous", text, createdAt: new Date().toISOString(), isHidden: false,
+  };
+  const sb = await getSupabase();
+  if (sb) { try {} catch {} }
+  const comments = getCommentsStorage();
+  setCommentsStorage([...comments, comment]);
+  return comment;
+}
+
+export async function getComments(dropId: string): Promise<CommentRecord[]> {
+  return getCommentsStorage().filter(c => c.dropId === dropId && !c.isHidden)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export async function getSocialCounts(dropId: string): Promise<{ likes: number; reactions: number; comments: number }> {
+  return {
+    likes: (await getLikes(dropId)),
+    reactions: (await getReactions(dropId)).length,
+    comments: (await getComments(dropId)).length,
+  };
+}
+
+export function shareWallLink() {
+  const url = window.location.href.split("?")[0];
+  shareOrCopy(url, "Drops ✦");
+}
+
+export function shareDropLink(dropId: string) {
+  const url = `${window.location.href.split("?")[0]}?drop=${dropId}`;
+  shareOrCopy(url, "Drop ✦");
+}
+
+async function shareOrCopy(url: string, title: string) {
+  if (navigator.share) {
+    try { await navigator.share({ title, url }); return; } catch {}
+  }
+  try { await navigator.clipboard.writeText(url); } catch {}
+}
+
 function buildCardFromInput(input: DropInput): UserCard {
   return {
     bg: input.accent_color,

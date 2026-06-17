@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "motion/react";
 import { X, Image, Type, Sticker, ArrowRight, RotateCw, Camera, Trash2, Layers } from "lucide-react";
 import { MAX_CARDS, type UserCard } from "../data/defaults";
-import { Button } from "../../components/ui/button";
+// Using native button instead of shadcn Button to test rendering
 
 type Tab = "text" | "image" | "gif" | "sticker";
 
@@ -456,9 +456,10 @@ export default function AddCardModal({ onClose, onPost, cardCount }: AddCardModa
               </div>
 
               {/* Submit */}
-              <Button onClick={handleSubmit} disabled={elements.length === 0} className="w-full h-12 text-sm font-semibold"
-                style={{ cursor: elements.length > 0 ? "pointer" : "not-allowed" }}
-              >Drop it <ArrowRight size={15} /></Button>
+              <button onClick={handleSubmit} disabled={elements.length === 0}
+                className="w-full h-12 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 transition-all"
+                style={{ background: elements.length > 0 ? "#111" : "rgba(17,17,17,0.1)", color: elements.length > 0 ? "#fff" : "rgba(17,17,17,0.3)", cursor: elements.length > 0 ? "pointer" : "not-allowed" }}
+              >Drop it <ArrowRight size={15} /></button>
             </>
           )}
         </div>

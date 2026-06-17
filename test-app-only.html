@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html><body>
+<div id="root">FAIL</div>
+<script type="module">
+import React from 'http://localhost:5173/node_modules/.vite/deps/react.js?v=f00f38c6';
+import ReactDOM from 'http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=f00f38c6';
+
+const root = document.getElementById('root');
+try {
+  const App = (await import('http://localhost:5173/src/app/App.tsx')).default;
+  root.textContent = 'App loaded, rendering...';
+  ReactDOM.createRoot(root).render(React.createElement(React.StrictMode, null, React.createElement(App)));
+  // If we get here, render was called
+  setTimeout(() => {
+    root.innerHTML += '<div style="margin-top:10px;padding:10px;background:green;color:white">RENDER_COMPLETE - html: ' + root.innerHTML.length + ' chars</div>';
+  }, 2000);
+} catch(e) {
+  root.textContent = 'ERROR: ' + e.message;
+}
+</script>
+</body>
+</html>

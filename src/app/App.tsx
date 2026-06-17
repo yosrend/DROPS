@@ -5,7 +5,7 @@ import { useGyroTilt } from "../hooks/useGyroTilt";
 import Onboarding from "./components/Onboarding";
 import AddCardModal from "./components/AddCardModal";
 import { CardFace } from "./components/CardFace";
-import { ONBOARDING_KEY, type UserCard } from "./data/defaults";
+import { ONBOARDING_KEY, CARDS_KEY, type UserCard } from "./data/defaults";
 import { getDrops, createDrop } from "../services/dropsService";
 import { getDeviceId } from "../utils/device";
 

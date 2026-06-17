@@ -129,7 +129,6 @@ function CardModal({ onClose, onPost }: {
   const [newCard, setNewCard] = useState<NewCard | null>(null);
 
   const chosen = CARD_STYLES[styleIdx];
-  const isGrad = chosen.bg.startsWith("linear");
 
   const handlePost = () => {
     if (!quote.trim()) return;

@@ -977,7 +977,7 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
   const getStyle = (i: number): React.CSSProperties => {
     const h = MOBILE_HEIGHTS[i];
     const baseX = (vp.w - CARD_W) / 2;
-    const baseY = (vp.h - h) / 2 - 30;
+    const baseY = (vp.h - h) / 2 - 40;
     const card = CARDS_DATA[i];
 
     const base: React.CSSProperties = {
@@ -1040,8 +1040,8 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
     const yOff = rel * CARD_PITCH;
 
     if (dist < 0.5) {
-      const scale = 1 - dist * 0.12;
-      const op = 1 - dist * 0.2;
+      const scale = 1 + (0.5 - dist) * 0.08;
+      const op = 1;
       return {
         ...base,
         left: baseX,
@@ -1060,28 +1060,45 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
         transition: "none",
       };
     }
-    if (dist < 1.5) {
-      const s = 0.94 - (dist - 0.5) * 0.12;
-      const o = 0.8 - (dist - 0.5) * 0.3;
+    if (dist < 1) {
+      const t = (dist - 0.5) * 2;
+      const s = 1.04 - t * 0.2;
+      const o = 1 - t * 0.3;
       return {
         ...base,
         left: baseX, top: baseY,
-        transform: "translateY(" + yOff + "px) rotate(2.5deg) scale(" + s + ")",
+        transform: "translateY(" + yOff + "px) scale(" + s + ")",
         opacity: o,
+        zIndex: 44,
+        visibility: "visible",
+        pointerEvents: "none",
+        transition: "none",
+      };
+    }
+    if (dist < 1.5) {
+      const t = (dist - 1) * 2;
+      const s = 0.84 - t * 0.08;
+      const o = 0.7 - t * 0.3;
+      return {
+        ...base,
+        left: baseX, top: baseY,
+        transform: "translateY(" + yOff + "px) scale(" + s + ")",
+        opacity: Math.max(o, 0.1),
         filter: "blur(0.5px)",
-        zIndex: 40,
+        zIndex: 38,
         visibility: "visible",
         pointerEvents: "none",
         transition: "none",
       };
     }
     if (dist < 2.5) {
-      const s = 0.82 - (dist - 1.5) * 0.06;
-      const o = 0.5 - (dist - 1.5) * 0.3;
+      const t = (dist - 1.5) / 1;
+      const s = 0.76 - t * 0.1;
+      const o = 0.4 - t * 0.2;
       return {
         ...base,
         left: baseX, top: baseY,
-        transform: "translateY(" + yOff + "px) rotate(-1.5deg) scale(" + Math.max(s, 0.7) + ")",
+        transform: "translateY(" + yOff + "px) scale(" + Math.max(s, 0.66) + ")",
         opacity: Math.max(o, 0.05),
         filter: "blur(1px)",
         zIndex: 30,
@@ -1121,15 +1138,6 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
           ))}
         </div>
       </div>
-
-      {mode === "stack" && (
-        <button
-          onClick={(e) => { e.stopPropagation(); gyro.requestPermission(); }}
-          className="absolute z-[100]"
-          style={{ bottom: 56, left: "50%", transform: "translateX(-50%)", fontSize: 9, color: "#bbb", fontFamily: "Inter,sans-serif", textDecoration: "underline" }}>
-          Enable motion
-        </button>
-      )}
 
       <button
         onClick={e => { e.stopPropagation(); onAdd(); }}

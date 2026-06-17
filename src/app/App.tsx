@@ -795,11 +795,12 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
 // ── Mobile Stack View ─────────────────────────────────────────────────────────
 
 function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?: (i: number) => void }) {
-  const [mode, setMode] = useState<"stack" | "scatter">("stack");
+  const [mode, setMode] = useState<"stack" | "carousel" | "scatter">("stack");
   const [scrollPos, setScrollPos] = useState(0);
+  const [scrollPosX, setScrollPosX] = useState(0);
   const [panX, setPanX] = useState(0);
-  const [scattering, setScattering] = useState(false);
-  const [scatterPhase, setScatterPhase] = useState(0); // 0=done, 1=start, 2=animate
+  const [anim, setAnim] = useState(false); // generic transition flag
+  const [animPhase, setAnimPhase] = useState(0); // 0=done, 1=start(no transition), 2=animating
   const rafRef = useRef<number>(0);
 
   // pinch state
@@ -820,68 +821,74 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // smooth snap to nearest card (infinite wrap)
-  const snapToNearest = (from: number) => {
+  const STACK_PITCH = 50;
+  const CAROUSEL_PITCH = 280;
+
+  // snap helper for both axes
+  const snapToNearest = (from: number, setter: (v: number) => void) => {
     const total = CARDS_DATA.length;
     const nearest = Math.round(from);
     const start = from;
     const diff = nearest - start;
     const dur = 300;
     if (Math.abs(diff) < 0.01) {
-      // wrap around
       let p = nearest;
       if (p < 0) p += total;
       if (p >= total) p -= total;
-      if (p !== nearest) { setScrollPos(p); }
+      if (p !== nearest) setter(p);
       return;
     }
     const t0 = performance.now();
     const animate = (now: number) => {
       const dt = Math.min((now - t0) / dur, 1);
       const e = 1 - Math.pow(1 - dt, 3);
-      setScrollPos(start + diff * e);
+      setter(start + diff * e);
       if (dt < 1) rafRef.current = requestAnimationFrame(animate);
       else {
-        // wrap after animation completes
         let p = start + diff;
         if (p < 0) p += total;
         if (p >= total) p -= total;
-        setScrollPos(p);
+        setter(p);
       }
     };
     cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(animate);
   };
 
-  const drag = useRef({ active: false, startX: 0, startY: 0, baseScroll: 0 });
+  const drag = useRef({ active: false, startX: 0, startY: 0, baseScroll: 0, baseScrollX: 0 });
   const tap = useRef({ count: 0, timer: null as ReturnType<typeof setTimeout> | null });
   const pan = useRef({ active: false, lastX: 0 });
 
-  const CARD_PITCH = 50;
-
-  // scatter launch animation effect
+  // generic transition effect
   useEffect(() => {
-    if (scattering) {
-      setScatterPhase(1); // start: render at stack position, no transition
+    if (anim) {
+      setAnimPhase(1);
       const id = requestAnimationFrame(() => {
-        setScatterPhase(2); // animate: move to scatter positions with transition
+        setAnimPhase(2);
       });
+      setTimeout(() => { setAnim(false); setAnimPhase(0); }, 700);
       return () => cancelAnimationFrame(id);
     } else {
-      setScatterPhase(0); // done
+      setAnimPhase(0);
     }
-  }, [scattering]);
+  }, [anim]);
 
   const toggleMode = () => {
     if (mode === "stack") {
-      setScattering(true);
       cancelAnimationFrame(rafRef.current);
-      setMode("scatter");
-      setPanX(0);
+      setScrollPosX(scrollPos);
+      setAnim(true);
+      setMode("carousel");
       setScatterScale(1);
-      setTimeout(() => setScattering(false), 700);
+    } else if (mode === "carousel") {
+      cancelAnimationFrame(rafRef.current);
+      setScrollPos(scrollPosX);
+      setAnim(true);
+      // animPhase will trigger: phase 1→stack starts at carousel pos, phase 2→animates
+      setMode("stack");
+      setScatterScale(1);
     } else {
-      setScattering(false);
+      setAnim(false);
       setMode("stack");
       setScatterScale(1);
       setScrollPos(0);
@@ -918,13 +925,13 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
     if (e.touches.length === 2 && pinchStartDistanceRef.current) {
       const currentDist = getTouchDistance(e.touches);
       const diff = currentDist - pinchStartDistanceRef.current;
-      if (mode === "stack") {
+      if (mode === "carousel") {
         if (diff < -20 && !pinchTriggeredRef.current) {
           pinchTriggeredRef.current = true;
+          setAnim(true);
           setMode("scatter");
-          setScattering(true);
           setPanX(0);
-          setTimeout(() => setScattering(false), 700);
+          setScatterScale(1);
         }
         return;
       }
@@ -934,6 +941,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
         if (diff > 20 && !pinchTriggeredRef.current) {
           pinchTriggeredRef.current = true;
           cancelAnimationFrame(rafRef.current);
+          setAnim(false);
           setMode("stack");
           setScatterScale(1);
           setScrollPos(0);
@@ -942,7 +950,6 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
       return;
     }
     if (e.touches.length === 1) {
-      // skip single-finger if pinch is in progress
       if (pinchStartDistanceRef.current !== null) return;
       const touch = e.touches[0];
       if (mode === "scatter") {
@@ -950,11 +957,20 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
         return;
       }
       if (!drag.current.active) {
-        drag.current = { active: true, startX: touch.clientX, startY: touch.clientY, baseScroll: scrollPos };
+        drag.current = {
+          active: true, startX: touch.clientX, startY: touch.clientY,
+          baseScroll: scrollPos, baseScrollX: scrollPosX,
+        };
       }
-      const dy = touch.clientY - drag.current.startY;
-      cancelAnimationFrame(rafRef.current);
-      setScrollPos(drag.current.baseScroll - dy / CARD_PITCH);
+      if (mode === "stack") {
+        const dy = touch.clientY - drag.current.startY;
+        cancelAnimationFrame(rafRef.current);
+        setScrollPos(drag.current.baseScroll - dy / STACK_PITCH);
+      } else if (mode === "carousel") {
+        const dx = touch.clientX - drag.current.startX;
+        cancelAnimationFrame(rafRef.current);
+        setScrollPosX(drag.current.baseScrollX - dx / CAROUSEL_PITCH);
+      }
     }
   };
 
@@ -964,17 +980,18 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
       pinchTriggeredRef.current = false;
       drag.current.active = false;
       pan.current.active = false;
-      return; // don't snap after pinch
+      return;
     }
     if (mode === "scatter") { pan.current.active = false; return; }
     if (!drag.current.active) return;
     drag.current.active = false;
-    snapToNearest(scrollPos);
+    if (mode === "stack") snapToNearest(scrollPos, setScrollPos);
+    else if (mode === "carousel") snapToNearest(scrollPosX, setScrollPosX);
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (mode === "scatter") { pan.current = { active: true, lastX: e.clientX }; return; }
-    drag.current = { active: true, startX: e.clientX, startY: e.clientY, baseScroll: scrollPos };
+    drag.current = { active: true, startX: e.clientX, startY: e.clientY, baseScroll: scrollPos, baseScrollX: scrollPosX };
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -984,16 +1001,23 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
       return;
     }
     if (!drag.current.active) return;
-    const dy = e.clientY - drag.current.startY;
-    cancelAnimationFrame(rafRef.current);
-    setScrollPos(drag.current.baseScroll - dy / CARD_PITCH);
+    if (mode === "stack") {
+      const dy = e.clientY - drag.current.startY;
+      cancelAnimationFrame(rafRef.current);
+      setScrollPos(drag.current.baseScroll - dy / STACK_PITCH);
+    } else if (mode === "carousel") {
+      const dx = e.clientX - drag.current.startX;
+      cancelAnimationFrame(rafRef.current);
+      setScrollPosX(drag.current.baseScrollX - dx / CAROUSEL_PITCH);
+    }
   };
 
   const onPointerUp = () => {
     if (mode === "scatter") { pan.current.active = false; return; }
     if (!drag.current.active) return;
     drag.current.active = false;
-    snapToNearest(scrollPos);
+    if (mode === "stack") snapToNearest(scrollPos, setScrollPos);
+    else if (mode === "carousel") snapToNearest(scrollPosX, setScrollPosX);
   };
 
   const getStyle = (i: number): React.CSSProperties => {
@@ -1001,6 +1025,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
     const baseX = (vp.w - CARD_W) / 2;
     const baseY = (vp.h - h) / 2 - 40;
     const card = CARDS_DATA[i];
+    const total = CARDS_DATA.length;
 
     const base: React.CSSProperties = {
       position: "absolute",
@@ -1016,104 +1041,203 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
       fontFamily: "Inter,sans-serif",
     };
 
+    // ── Scatter mode ──
     if (mode === "scatter") {
       const p = SCATTER_POS[i % SCATTER_POS.length];
       const cardScale = p.s * scatterScale;
       const nearestCard = Math.round(scrollPos);
       const depthDist = Math.min(Math.abs(i - nearestCard), 6);
-      const depthDelay = scatterPhase === 2 ? (depthDist * 50 + "ms") : "0ms";
+      const depthDelay = animPhase === 2 ? (depthDist * 50 + "ms") : "0ms";
+      const isAnim = animPhase === 2;
 
-      // phase 0: scatter stable, no transition
-      // phase 1: just launched, cards at stack center, no transition
-      // phase 2: animate from stack center to scatter positions
-      const isAnimating = scatterPhase === 2;
-      const targetLeft = isAnimating || scatterPhase === 0 ? p.x : baseX;
-      const targetTop = isAnimating || scatterPhase === 0 ? p.y : baseY;
+      // carousel offset for phase 1 starting position
+      const cxCopies = [i, i + total, i - total];
+      const cxClosest = cxCopies.reduce((a, b) => Math.abs(b - scrollPosX) < Math.abs(a - scrollPosX) ? b : a);
+      const cxRel = cxClosest - scrollPosX;
+      const cxOff = cxRel * 60;
+      const cxScale = 1 + (0.5 - Math.min(Math.abs(cxRel), 0.5)) * 0.05;
 
       return {
         ...base,
-        left: targetLeft,
-        top: targetTop,
-        transform: [
-          "translateX(" + (panX + gyro.offsetX) + "px)",
-          "translateY(" + gyro.offsetY + "px)",
-          "scale(" + cardScale + ")",
-          "rotate(" + p.r + "deg)",
-        ].join(" "),
+        left: p.x,
+        top: p.y,
+        transform: animPhase === 1
+          ? "translateX(" + cxOff + "px) scale(" + cxScale + ")"
+          : [
+              "translateX(" + (panX + gyro.offsetX) + "px)",
+              "translateY(" + gyro.offsetY + "px)",
+              "scale(" + cardScale + ")",
+              "rotate(" + p.r + "deg)",
+            ].join(" "),
         transformOrigin: "center center",
         opacity: 1,
         zIndex: 10 + i,
         visibility: "visible",
         pointerEvents: "auto",
-        transition: isAnimating
-          ? [
-              "transform 560ms cubic-bezier(.34,1.2,.64,1)",
-              "left 560ms cubic-bezier(.34,1.2,.64,1)",
-              "top 560ms cubic-bezier(.34,1.2,.64,1)",
-            ].join(", ")
+        transition: isAnim
+          ? "transform 560ms cubic-bezier(.34,1.2,.64,1), left 560ms cubic-bezier(.34,1.2,.64,1), top 560ms cubic-bezier(.34,1.2,.64,1)"
           : "none",
         transitionDelay: depthDelay,
       };
     }
 
-    // continuous scroll stack mode (infinite wrap)
-    const total = CARDS_DATA.length;
+    // ── Carousel mode ──
+    if (mode === "carousel") {
+      const copies = [i, i + total, i - total];
+      const closest = copies.reduce((a, b) => Math.abs(b - scrollPosX) < Math.abs(a - scrollPosX) ? b : a);
+      const rel = closest - scrollPosX;
+      const dist = Math.abs(rel);
+      const xOff = rel * 60;
+      const depthDelay = animPhase === 2 ? (dist * 40 + "ms") : "0ms";
+      const isAnim = animPhase === 2;
+
+      // stack offset used for phase 1 starting position
+      const stackCopies = [i, i + total, i - total];
+      const stackClosest = stackCopies.reduce((a, b) => Math.abs(b - scrollPos) < Math.abs(a - scrollPos) ? b : a);
+      const stackRel = stackClosest - scrollPos;
+      const stackYOff = stackRel * STACK_PITCH;
+
+      if (dist < 0.5) {
+        const s = 1 + (0.5 - dist) * 0.05;
+        return {
+          ...base, left: baseX, top: baseY,
+          transform: animPhase === 1
+            ? "translateY(" + stackYOff + "px)"
+            : "translateX(" + xOff + "px) scale(" + s + ")",
+          opacity: 1, zIndex: 50, visibility: "visible", pointerEvents: "auto",
+          transition: isAnim ? "transform 560ms cubic-bezier(.34,1.2,.64,1)" : "none",
+          transitionDelay: depthDelay,
+        };
+      }
+      if (dist < 1) {
+        const t = (dist - 0.5) * 2;
+        const s = 1.025 - t * 0.15;
+        return {
+          ...base, left: baseX, top: baseY,
+          transform: animPhase === 1
+            ? "translateY(" + stackYOff + "px) scale(" + s + ")"
+            : "translateX(" + xOff + "px) scale(" + s + ")",
+          opacity: 1 - t * 0.2, zIndex: 46, visibility: "visible", pointerEvents: "none",
+          transition: isAnim ? "transform 560ms cubic-bezier(.34,1.2,.64,1)" : "none",
+          transitionDelay: depthDelay,
+        };
+      }
+      if (dist < 1.5) {
+        const t = (dist - 1) * 2;
+        const s = 0.875 - t * 0.06;
+        return {
+          ...base, left: baseX, top: baseY,
+          transform: animPhase === 1
+            ? "translateY(" + stackYOff + "px) scale(" + s + ")"
+            : "translateX(" + xOff + "px) scale(" + s + ")",
+          opacity: 0.8 - t * 0.2, zIndex: 42, visibility: "visible", pointerEvents: "none",
+          transition: isAnim ? "transform 560ms cubic-bezier(.34,1.2,.64,1)" : "none",
+          transitionDelay: depthDelay,
+        };
+      }
+      if (dist < 2.5) {
+        const t = (dist - 1.5) / 1;
+        const s = Math.max(0.815 - t * 0.06, 0.7);
+        return {
+          ...base, left: baseX, top: baseY,
+          transform: animPhase === 1
+            ? "translateY(" + stackYOff + "px) scale(" + s + ")"
+            : "translateX(" + xOff + "px) scale(" + s + ")",
+          opacity: Math.max(0.6 - t * 0.2, 0.1),
+          filter: "blur(0.5px)", zIndex: 38, visibility: "visible", pointerEvents: "none",
+          transition: isAnim ? "transform 560ms cubic-bezier(.34,1.2,.64,1)" : "none",
+          transitionDelay: depthDelay,
+        };
+      }
+      return { ...base, visibility: "hidden", opacity: 0, zIndex: 5, pointerEvents: "none" };
+    }
+
+    // ── Stack mode ──
     const copies = [i, i + total, i - total];
     const closest = copies.reduce((a, b) => Math.abs(b - scrollPos) < Math.abs(a - scrollPos) ? b : a);
     const rel = closest - scrollPos;
     const dist = Math.abs(rel);
-    const yOff = rel * CARD_PITCH;
+    const yOff = rel * STACK_PITCH;
+
+    // carousel offset for phase 1 (carousel→stack transition)
+    const stCopies = [i, i + total, i - total];
+    const stClosest = stCopies.reduce((a, b) => Math.abs(b - scrollPosX) < Math.abs(a - scrollPosX) ? b : a);
+    const stRel = stClosest - scrollPosX;
+    const stXOff = stRel * 60;
+
+    const isAnim = animPhase === 2;
+    const startPos = animPhase === 1 ? "translateX(" + stXOff + "px) " : "";
+    const endPos = "translateY(" + yOff + "px) ";
 
     if (dist < 0.5) {
       const scale = 1 + (0.5 - dist) * 0.06;
       return {
         ...base, left: baseX, top: baseY,
-        transform: [
-          "perspective(900px)",
-          "rotateX(" + gyro.rotateX + "deg)",
-          "rotateY(" + gyro.rotateY + "deg)",
-          "translateY(" + yOff + "px)",
-          "scale(" + scale + ")",
-        ].join(" "),
-        opacity: 1, zIndex: 50, visibility: "visible", pointerEvents: "auto", transition: "none",
+        transform: animPhase === 1
+          ? "translateX(" + stXOff + "px)"
+          : [
+              "perspective(900px)",
+              "rotateX(" + gyro.rotateX + "deg)",
+              "rotateY(" + gyro.rotateY + "deg)",
+              "translateY(" + yOff + "px)",
+              "scale(" + scale + ")",
+            ].join(" "),
+        opacity: 1, zIndex: 50, visibility: "visible", pointerEvents: "auto",
+        transition: isAnim ? "transform 560ms cubic-bezier(.34,1.2,.64,1)" : "none",
       };
     }
     if (dist < 1) {
       const t = (dist - 0.5) * 2;
+      const s = 1.03 - t * 0.1;
       return {
         ...base, left: baseX, top: baseY,
-        transform: "translateY(" + yOff + "px) scale(" + (1.03 - t * 0.1) + ")",
+        transform: animPhase === 1
+          ? "translateX(" + stXOff + "px) scale(" + s + ")"
+          : "translateY(" + yOff + "px) scale(" + s + ")",
         opacity: 1 - t * 0.2,
-        zIndex: 46, visibility: "visible", pointerEvents: "none", transition: "none",
+        zIndex: 46, visibility: "visible", pointerEvents: "none",
+        transition: isAnim ? "transform 560ms cubic-bezier(.34,1.2,.64,1)" : "none",
       };
     }
     if (dist < 1.5) {
       const t = (dist - 1) * 2;
+      const s = 0.93 - t * 0.06;
       return {
         ...base, left: baseX, top: baseY,
-        transform: "translateY(" + yOff + "px) scale(" + (0.93 - t * 0.06) + ")",
+        transform: animPhase === 1
+          ? "translateX(" + stXOff + "px) scale(" + s + ")"
+          : "translateY(" + yOff + "px) scale(" + s + ")",
         opacity: 0.8 - t * 0.2,
-        zIndex: 42, visibility: "visible", pointerEvents: "none", transition: "none",
+        zIndex: 42, visibility: "visible", pointerEvents: "none",
+        transition: isAnim ? "transform 560ms cubic-bezier(.34,1.2,.64,1)" : "none",
       };
     }
     if (dist < 2) {
       const t = (dist - 1.5) * 2;
+      const s = 0.87 - t * 0.05;
       return {
         ...base, left: baseX, top: baseY,
-        transform: "translateY(" + yOff + "px) scale(" + (0.87 - t * 0.05) + ")",
+        transform: animPhase === 1
+          ? "translateX(" + stXOff + "px) scale(" + s + ")"
+          : "translateY(" + yOff + "px) scale(" + s + ")",
         opacity: 0.6 - t * 0.2,
         filter: "blur(0.5px)",
-        zIndex: 38, visibility: "visible", pointerEvents: "none", transition: "none",
+        zIndex: 38, visibility: "visible", pointerEvents: "none",
+        transition: isAnim ? "transform 560ms cubic-bezier(.34,1.2,.64,1)" : "none",
       };
     }
     if (dist < 3) {
       const t = (dist - 2) / 1;
+      const s = Math.max(0.82 - t * 0.08, 0.7);
       return {
         ...base, left: baseX, top: baseY,
-        transform: "translateY(" + yOff + "px) scale(" + Math.max(0.82 - t * 0.08, 0.7) + ")",
+        transform: animPhase === 1
+          ? "translateX(" + stXOff + "px) scale(" + s + ")"
+          : "translateY(" + yOff + "px) scale(" + s + ")",
         opacity: Math.max(0.4 - t * 0.15, 0.1),
         filter: "blur(1px)",
-        zIndex: 34, visibility: "visible", pointerEvents: "none", transition: "none",
+        zIndex: 34, visibility: "visible", pointerEvents: "none",
+        transition: isAnim ? "transform 560ms cubic-bezier(.34,1.2,.64,1)" : "none",
       };
     }
     return { ...base, visibility: "hidden", opacity: 0, zIndex: 5, pointerEvents: "none" };

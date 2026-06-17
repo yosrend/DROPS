@@ -11,13 +11,6 @@ export function CardFace({ quote, handle, bg, small = false }: {
   return (
     <>
       <div style={{
-        fontSize: small ? 7 : 8, textTransform: "uppercase", letterSpacing: ".1em",
-        color: mutedColor, fontWeight: 500,
-        padding: small ? "12px 12px 0" : "14px 14px 0",
-      }}>
-        Config 2025
-      </div>
-      <div style={{
         fontSize: small ? 13 : 15, fontWeight: 700, color: textColor, lineHeight: 1.3,
         padding: small ? "6px 12px" : "8px 14px",
         flex: 1, display: "flex", alignItems: "center",

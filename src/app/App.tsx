@@ -5,7 +5,9 @@ import { useGyroTilt } from "../hooks/useGyroTilt";
 import Onboarding from "./components/Onboarding";
 import AddCardModal from "./components/AddCardModal";
 import { CardFace } from "./components/CardFace";
-import { ONBOARDING_KEY, CARDS_KEY, type UserCard } from "./data/defaults";
+import { ONBOARDING_KEY, type UserCard } from "./data/defaults";
+import { getDrops, createDrop } from "../services/dropsService";
+import { getDeviceId } from "../utils/device";
 
 // ── data ─────────────────────────────────────────────────────────────────────
 
@@ -15,25 +17,101 @@ const CARDS_DATA = [
   { bg: "#1ABCFE", quote: "Best Config yet. No contest.", handle: "@designlead" },
   { bg: "#111111", quote: "Mind. Blown.", handle: "@sarah_m" },
   { bg: "#FFCD29", quote: "Day 1 forever.", handle: "@jun" },
-  { bg: "#7B61FF", quote: "A Study in Pace.", handle: "@mariad" },
-  { bg: "#F24822", quote: "Can't believe I almost missed this.", handle: "@priya" },
-  { bg: "#1ABCFE", quote: "See you at Config 2026.", handle: "@thomas" },
-  { bg: "#111111", quote: "This changed how I think about design.", handle: "@nina" },
-  { bg: "#FFCD29", quote: "First Config. Not the last.", handle: "@alex" },
-  { bg: "#7B61FF", quote: "Drop your card.", handle: "@drops" },
-  { bg: "#F24822", quote: "Config 2025 — we were here.", handle: "@wei" },
-  { bg: "#1ABCFE", quote: "Infinite possibilities.", handle: "@aisha" },
-  { bg: "#F5F0E8", quote: "The future is collaborative.", handle: "@marcus" },
-  { bg: "#7B61FF", quote: "Pixel perfect, every time.", handle: "@leena" },
-  { bg: "#111111", quote: "Design without borders.", handle: "@raj" },
-  { bg: "#FFCD29", quote: "Keep building.", handle: "@taylor" },
-  { bg: "#F24822", quote: "Bold moves only.", handle: "@jordan" },
-  { bg: "#1ABCFE", quote: "Ship fast, ship often.", handle: "@sam" },
-  { bg: "#7B61FF", quote: "Collaboration is magic.", handle: "@emma" },
-  { bg: "#111111", quote: "Less talk, more design.", handle: "@noah" },
-  { bg: "#FFCD29", quote: "Dream big. Build bigger.", handle: "@mia" },
-  { bg: "#F5F0E8", quote: "Innovate or stagnate.", handle: "@liam" },
-  { bg: "#F24822", quote: "Break things. Fix them.", handle: "@zoe" },
+  { bg: "#F5F0E8", quote: "A Study in Pace.", handle: "@mariad" },
+  { bg: "#0FA958", quote: "Can't believe I almost missed this.", handle: "@priya" },
+  { bg: "#8338ec", quote: "See you at Config 2026.", handle: "@thomas" },
+  { bg: "#ff006e", quote: "This changed how I think about design.", handle: "@nina" },
+  { bg: "#3a86ff", quote: "First Config. Not the last.", handle: "@alex" },
+  { bg: "#7B61FF", quote: "Drop your card.", handle: "@wei" },
+  { bg: "#F24822", quote: "Config 2025 — we were here.", handle: "@aisha" },
+  { bg: "#1ABCFE", quote: "Infinite possibilities.", handle: "@marcus" },
+  { bg: "#111111", quote: "The future is collaborative.", handle: "@leena" },
+  { bg: "#FFCD29", quote: "Pixel perfect, every time.", handle: "@raj" },
+  { bg: "#F5F0E8", quote: "Design without borders.", handle: "@taylor" },
+  { bg: "#0FA958", quote: "Keep building.", handle: "@jordan" },
+  { bg: "#8338ec", quote: "Bold moves only.", handle: "@sam" },
+  { bg: "#ff006e", quote: "Ship fast, ship often.", handle: "@emma" },
+  { bg: "#3a86ff", quote: "Collaboration is magic.", handle: "@noah" },
+  { bg: "#7B61FF", quote: "Less talk, more design.", handle: "@mia" },
+  { bg: "#F24822", quote: "Dream big. Build bigger.", handle: "@liam" },
+  { bg: "#1ABCFE", quote: "Innovate or stagnate.", handle: "@zoe" },
+  { bg: "#111111", quote: "Break things. Fix them.", handle: "@kira" },
+  { bg: "#FFCD29", quote: "We shape our tools.", handle: "@oliver" },
+  { bg: "#F5F0E8", quote: "Design is never done.", handle: "@luna" },
+  { bg: "#0FA958", quote: "Make it pop.", handle: "@ethan" },
+  { bg: "#8338ec", quote: "Less is more.", handle: "@ava" },
+  { bg: "#ff006e", quote: "Form follows function.", handle: "@liam" },
+  { bg: "#3a86ff", quote: "Think different.", handle: "@mia" },
+  { bg: "#7B61FF", quote: "Stay hungry.", handle: "@devstudio" },
+  { bg: "#F24822", quote: "Create something great.", handle: "@carlos_ux" },
+  { bg: "#1ABCFE", quote: "Simplicity is key.", handle: "@designlead" },
+  { bg: "#111111", quote: "Design for everyone.", handle: "@sarah_m" },
+  { bg: "#FFCD29", quote: "Build with intention.", handle: "@jun" },
+  { bg: "#F5F0E8", quote: "Move fast and break things.", handle: "@mariad" },
+  { bg: "#0FA958", quote: "Ideas worth spreading.", handle: "@priya" },
+  { bg: "#8338ec", quote: "Creativity takes courage.", handle: "@thomas" },
+  { bg: "#ff006e", quote: "Done is better than perfect.", handle: "@nina" },
+  { bg: "#3a86ff", quote: "Good design is invisible.", handle: "@alex" },
+  { bg: "#7B61FF", quote: "Every pixel matters.", handle: "@wei" },
+  { bg: "#F24822", quote: "Design with purpose.", handle: "@aisha" },
+  { bg: "#1ABCFE", quote: "Start before you're ready.", handle: "@marcus" },
+  { bg: "#111111", quote: "Figma just changed everything. Again. ✦2", handle: "@leena" },
+  { bg: "#FFCD29", quote: "The energy in that room was unreal. ✦2", handle: "@raj" },
+  { bg: "#F5F0E8", quote: "Best Config yet. No contest. ✦2", handle: "@taylor" },
+  { bg: "#0FA958", quote: "Mind. Blown. ✦2", handle: "@jordan" },
+  { bg: "#8338ec", quote: "Day 1 forever. ✦2", handle: "@sam" },
+  { bg: "#ff006e", quote: "A Study in Pace. ✦2", handle: "@emma" },
+  { bg: "#3a86ff", quote: "Can't believe I almost missed this. ✦2", handle: "@noah" },
+  { bg: "#7B61FF", quote: "See you at Config 2026. ✦2", handle: "@mia" },
+  { bg: "#F24822", quote: "This changed how I think about design. ✦2", handle: "@liam" },
+  { bg: "#1ABCFE", quote: "First Config. Not the last. ✦2", handle: "@zoe" },
+  { bg: "#111111", quote: "Drop your card. ✦2", handle: "@kira" },
+  { bg: "#FFCD29", quote: "Config 2025 — we were here. ✦2", handle: "@oliver" },
+  { bg: "#F5F0E8", quote: "Infinite possibilities. ✦2", handle: "@luna" },
+  { bg: "#0FA958", quote: "The future is collaborative. ✦2", handle: "@ethan" },
+  { bg: "#8338ec", quote: "Pixel perfect, every time. ✦2", handle: "@ava" },
+  { bg: "#ff006e", quote: "Design without borders. ✦2", handle: "@liam" },
+  { bg: "#3a86ff", quote: "Keep building. ✦2", handle: "@mia" },
+  { bg: "#7B61FF", quote: "Bold moves only. ✦2", handle: "@devstudio" },
+  { bg: "#F24822", quote: "Ship fast, ship often. ✦2", handle: "@carlos_ux" },
+  { bg: "#1ABCFE", quote: "Collaboration is magic. ✦2", handle: "@designlead" },
+  { bg: "#111111", quote: "Less talk, more design. ✦2", handle: "@sarah_m" },
+  { bg: "#FFCD29", quote: "Dream big. Build bigger. ✦2", handle: "@jun" },
+  { bg: "#F5F0E8", quote: "Innovate or stagnate. ✦2", handle: "@mariad" },
+  { bg: "#0FA958", quote: "Break things. Fix them. ✦2", handle: "@priya" },
+  { bg: "#8338ec", quote: "We shape our tools. ✦2", handle: "@thomas" },
+  { bg: "#ff006e", quote: "Design is never done. ✦2", handle: "@nina" },
+  { bg: "#3a86ff", quote: "Make it pop. ✦2", handle: "@alex" },
+  { bg: "#7B61FF", quote: "Less is more. ✦2", handle: "@wei" },
+  { bg: "#F24822", quote: "Form follows function. ✦2", handle: "@aisha" },
+  { bg: "#1ABCFE", quote: "Think different. ✦2", handle: "@marcus" },
+  { bg: "#111111", quote: "Stay hungry. ✦2", handle: "@leena" },
+  { bg: "#FFCD29", quote: "Create something great. ✦2", handle: "@raj" },
+  { bg: "#F5F0E8", quote: "Simplicity is key. ✦2", handle: "@taylor" },
+  { bg: "#0FA958", quote: "Design for everyone. ✦2", handle: "@jordan" },
+  { bg: "#8338ec", quote: "Build with intention. ✦2", handle: "@sam" },
+  { bg: "#ff006e", quote: "Move fast and break things. ✦2", handle: "@emma" },
+  { bg: "#3a86ff", quote: "Ideas worth spreading. ✦2", handle: "@noah" },
+  { bg: "#7B61FF", quote: "Creativity takes courage. ✦2", handle: "@mia" },
+  { bg: "#F24822", quote: "Done is better than perfect. ✦2", handle: "@liam" },
+  { bg: "#1ABCFE", quote: "Good design is invisible. ✦2", handle: "@zoe" },
+  { bg: "#111111", quote: "Every pixel matters. ✦2", handle: "@kira" },
+  { bg: "#FFCD29", quote: "Design with purpose. ✦2", handle: "@oliver" },
+  { bg: "#F5F0E8", quote: "Start before you're ready. ✦2", handle: "@luna" },
+  { bg: "#0FA958", quote: "Figma just changed everything. Again. ✦3", handle: "@ethan" },
+  { bg: "#8338ec", quote: "The energy in that room was unreal. ✦3", handle: "@ava" },
+  { bg: "#ff006e", quote: "Best Config yet. No contest. ✦3", handle: "@liam" },
+  { bg: "#3a86ff", quote: "Mind. Blown. ✦3", handle: "@mia" },
+  { bg: "#7B61FF", quote: "Day 1 forever. ✦3", handle: "@devstudio" },
+  { bg: "#F24822", quote: "A Study in Pace. ✦3", handle: "@carlos_ux" },
+  { bg: "#1ABCFE", quote: "Can't believe I almost missed this. ✦3", handle: "@designlead" },
+  { bg: "#111111", quote: "See you at Config 2026. ✦3", handle: "@sarah_m" },
+  { bg: "#FFCD29", quote: "This changed how I think about design. ✦3", handle: "@jun" },
+  { bg: "#F5F0E8", quote: "First Config. Not the last. ✦3", handle: "@mariad" },
+  { bg: "#0FA958", quote: "Drop your card. ✦3", handle: "@priya" },
+  { bg: "#8338ec", quote: "Config 2025 — we were here. ✦3", handle: "@thomas" },
+  { bg: "#ff006e", quote: "Infinite possibilities. ✦3", handle: "@nina" },
+  { bg: "#3a86ff", quote: "The future is collaborative. ✦3", handle: "@alex" }
 ];
 
 const CARD_STYLES = [
@@ -76,7 +154,7 @@ function blurAmt(z: number) {
 
 // ── mobile layout constants ───────────────────────────────────────────────────
 
-const MOBILE_HEIGHTS = [400, 380, 420, 360, 370, 390, 375, 410, 385, 360, 395, 370, 405, 375, 415, 365, 380, 395, 400, 370, 385, 410, 390, 360];
+const MOBILE_HEIGHTS = Array(24).fill(457);
 const CARD_W = 320;
 const PHONE_W = 390;
 const PHONE_H = 640;
@@ -187,10 +265,9 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
         [-vw, 0, vw].forEach((xOff) => {
           [-vh, 0, vh].forEach((yOff) => {
             const el = document.createElement("div");
-            el.style.cssText = `position:absolute;border-radius:20px;overflow:hidden;user-select:none;will-change:transform,filter,opacity;backface-visibility:hidden;display:flex;flex-direction:column;justify-content:space-between;width:${w}px;height:${h}px;background:${data.bg};left:${bx + xOff}px;top:${by + yOff}px;box-shadow:0 8px 32px rgba(0,0,0,0.35);font-family:Inter,sans-serif;`;
+            el.style.cssText = `position:absolute;border-radius:10px;overflow:hidden;user-select:none;will-change:transform,filter,opacity;backface-visibility:hidden;display:flex;flex-direction:column;justify-content:space-between;width:${w}px;height:${h}px;background:${data.bg};left:${bx + xOff}px;top:${by + yOff}px;box-shadow:0 8px 32px rgba(0,0,0,0.35);font-family:Inter,sans-serif;`;
             el.innerHTML = `
-              <div style="font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:${mutedColor};font-weight:500;padding:14px 14px 0">Config 2025</div>
-              <div style="font-size:14px;font-weight:700;color:${textColor};line-height:1.3;padding:8px 14px;flex:1;display:flex;align-items:center">${data.quote}</div>
+              <div style="font-size:14px;font-weight:700;color:${textColor};line-height:1.3;padding:14px 14px 0;flex:1;display:flex;align-items:center">${data.quote}</div>
               <div style="font-size:10px;color:${mutedColor};padding:0 14px 14px">${data.handle}</div>
               <div style="position:absolute;top:12px;right:12px;width:5px;height:5px;border-radius:50%;background:${light ? "rgba(17,17,17,0.25)" : "rgba(255,255,255,0.6)"}"></div>
             `;
@@ -421,107 +498,24 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
         {mode}
       </div>
 
-      {/* Counter (card mode) */}
-      {mode === "card" && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 pointer-events-none whitespace-nowrap z-10"
-          style={{ color: "rgba(17,17,17,0.25)", fontSize: 10, fontFamily: "Inter,sans-serif" }}>
-          {counter} of {CARDS_DATA.length}
-        </div>
-      )}
-
-      {/* Mode pills */}
-      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 flex gap-2 items-center z-[100]">
-        {(["scatter", "card"] as const).map(m => (
-          <button
-            key={m}
-            onClick={() => setModeRef.current(m)}
-            className="h-[38px] rounded-full border px-4 text-[11px] tracking-[.05em] transition-all"
-            style={{
-              background: mode === m ? "rgba(17,17,17,0.12)" : "rgba(17,17,17,0.05)",
-              borderColor: mode === m ? "rgba(17,17,17,0.25)" : "rgba(17,17,17,0.1)",
-              color: mode === m ? "#111" : "rgba(17,17,17,0.5)",
-              fontFamily: "Inter,sans-serif",
-              backdropFilter: "blur(10px)",
-            }}>
-            {m === "scatter" ? "Scatter View" : "Card View"}
-          </button>
-        ))}
-      </div>
-
-      {/* FAB */}
+      {/* Center FAB */}
       <button
         onClick={onAdd}
-        className="absolute bottom-5 right-5 w-12 h-12 rounded-full flex items-center justify-center z-[100] transition-transform hover:scale-110 active:scale-95"
+        className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center justify-center gap-2 z-[100] transition-all hover:scale-105 active:scale-95"
         style={{
-          background: "rgba(17,17,17,0.08)",
-          border: "1px solid rgba(17,17,17,0.15)",
-          backdropFilter: "blur(12px)",
-        }}>
-        <Plus size={18} color="#111" />
-      </button>
-
-      {/* Spacing controls toggle */}
-      <button
-        onClick={() => setShowControls(p => !p)}
-        className="absolute bottom-5 left-5 flex items-center justify-center z-[100] transition-transform hover:scale-110 active:scale-95"
-        style={{
-          height: 38, paddingInline: 14,
-          borderRadius: 19,
-          background: "rgba(17,17,17,0.08)",
-          border: "1px solid rgba(17,17,17,0.15)",
-          backdropFilter: "blur(12px)",
-          color: "#111",
-          fontSize: 10,
+          height: 48, paddingInline: 24,
+          borderRadius: 24,
+          background: "#111",
+          color: "#fff",
           fontFamily: "Inter,sans-serif",
-          letterSpacing: ".05em",
+          fontSize: 13,
+          fontWeight: 500,
+          letterSpacing: ".02em",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
         }}>
-        {showControls ? "✕" : "◉ Controls"}
+        <Plus size={18} color="#fff" />
+        Drop your card
       </button>
-
-      {/* Control panel */}
-      {showControls && (
-        <div
-          className="absolute z-[200]"
-          style={{
-            bottom: 64, left: 20,
-            background: "rgba(255,255,255,0.95)",
-            border: "1px solid rgba(17,17,17,0.12)",
-            borderRadius: 16,
-            padding: "16px 20px",
-            backdropFilter: "blur(20px)",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
-            fontFamily: "Inter,sans-serif",
-            minWidth: 220,
-          }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "#111", marginBottom: 12, letterSpacing: ".04em" }}>
-            Spacing & Zoom
-          </div>
-          {[
-            { label: "Spread", val: spread, set: setSpread, min: 0.2, max: 1.5, step: 0.05, ref: spreadRef },
-            { label: "Depth", val: depthGap, set: setDepthGap, min: 200, max: 1200, step: 50, ref: depthGapRef },
-            { label: "Zoom", val: zoom, set: setZoom, min: 0.5, max: 2.5, step: 0.05, ref: zoomRef },
-          ].map(({ label, val, set, min, max, step }) => (
-            <div key={label} style={{ marginBottom: 10 }}>
-              <div style={{
-                display: "flex", justifyContent: "space-between",
-                fontSize: 10, color: "rgba(17,17,17,0.5)", marginBottom: 4,
-              }}>
-                <span>{label}</span>
-                <span style={{ fontWeight: 600, color: "#111" }}>{val}</span>
-              </div>
-              <input
-                type="range"
-                min={min}
-                max={max}
-                step={step}
-                value={val}
-                onChange={e => set(parseFloat(e.target.value))}
-                style={{ width: "100%", accentColor: "#7B61FF" }}
-              />
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -769,7 +763,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
       width: CARD_W,
       height: h,
       background: card.bg,
-      borderRadius: 20,
+      borderRadius: 14,
       overflow: "hidden",
       display: "flex",
       flexDirection: "column",
@@ -1058,7 +1052,7 @@ function CardGalleryModal({
       onClick={onClose}
     >
       <div
-        className="relative w-[min(440px,90vw)] rounded-[24px] bg-white p-4 shadow-2xl"
+        className="relative w-[min(440px,90vw)] rounded-[14px] bg-white p-4 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -1083,9 +1077,6 @@ function CardGalleryModal({
           className="relative flex h-[520px] flex-col justify-between overflow-hidden rounded-[20px] p-5"
           style={{ background: card.bg, fontFamily: "Inter,sans-serif" }}
         >
-          <div className="text-[10px] uppercase tracking-[0.14em] text-black/45">
-            CONFIG 2026
-          </div>
           <div className="flex flex-1 items-center text-[28px] font-bold leading-tight"
             style={{ color: card.bg === "#FFCD29" || card.bg === "#F5F0E8" ? "#111" : "#fff" }}>
             {card.quote}
@@ -1123,19 +1114,22 @@ export default function App() {
   // onboarding gate
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem(ONBOARDING_KEY) === "true");
 
-  // localStorage persistence
-  const [userCards, setUserCards] = useState<UserCard[]>(() => {
-    try {
-      const stored = localStorage.getItem(CARDS_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch { return []; }
-  });
+  // card state
+  const [userCards, setUserCards] = useState<UserCard[]>([]);
+  const [remoteCards, setRemoteCards] = useState<UserCard[]>([]);
   const [newCardId, setNewCardId] = useState<string | null>(null);
+  const [deviceId] = useState(() => getDeviceId());
 
-  // save user cards to localStorage
+  // load drops on mount
   useEffect(() => {
-    localStorage.setItem(CARDS_KEY, JSON.stringify(userCards));
-  }, [userCards]);
+    const stored = localStorage.getItem(CARDS_KEY);
+    if (stored) {
+      try { setUserCards(JSON.parse(stored)); } catch {}
+    }
+    getDrops().then(cards => {
+      if (cards.length > 0) setRemoteCards(cards);
+    });
+  }, []);
 
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768);
@@ -1157,18 +1151,41 @@ export default function App() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedCardIndex, userCards.length]);
+  }, [selectedCardIndex, remoteCards.length, userCards.length]);
 
-  const combinedCards = [...CARDS_DATA, ...userCards.map(u => ({
+  const combinedCards = [...CARDS_DATA, ...remoteCards, ...userCards].map(u => ({
     bg: u.bg,
     quote: u.type === "sticker" ? u.stickerLabel || u.quote : u.quote,
     handle: u.handle,
-  }))];
+  }));
 
-  const handlePost = (card: UserCard) => {
-    setUserCards(prev => [...prev, card]);
-    setNewCardId(card.id);
-    setTimeout(() => setNewCardId(null), 3000);
+  const handlePost = async (card: UserCard) => {
+    // try Supabase first, fall back to localStorage
+    const input = {
+      type: card.type,
+      text_content: card.quote,
+      caption: card.handle,
+      accent_color: card.accentColor,
+      mood_badge: card.moodBadge,
+      card_skin: card.cardSkin,
+      card_size: card.cardSize,
+      font_style: card.fontStyle,
+      text_align: card.textAlign,
+      sticker_label: card.stickerLabel,
+      user_name: card.userName,
+      user_role: card.userRole,
+      theme_id: card.themeId,
+    };
+    const result = await createDrop(input);
+    if (result) {
+      setUserCards(prev => {
+        const updated = [...prev, result];
+        localStorage.setItem(CARDS_KEY, JSON.stringify(updated));
+        return updated;
+      });
+      setNewCardId(result.id);
+      setTimeout(() => setNewCardId(null), 3000);
+    }
   };
 
   // onboarding

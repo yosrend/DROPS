@@ -977,7 +977,7 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
   const getStyle = (i: number): React.CSSProperties => {
     const h = MOBILE_HEIGHTS[i];
     const baseX = (vp.w - CARD_W) / 2;
-    const baseY = (vp.h - h) / 2;
+    const baseY = (vp.h - h) / 2 - 30;
     const card = CARDS_DATA[i];
 
     const base: React.CSSProperties = {
@@ -997,7 +997,10 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
     if (mode === "scatter") {
       const p = SCATTER_POS[i % SCATTER_POS.length];
       const cardScale = p.s * scatterScale;
-      const depthDelay = scattering ? (Math.abs(i - scrollPos) * 50 + "ms") : "0ms";
+      const totalCards = CARDS_DATA.length;
+      const copies = [i, i + totalCards, i - totalCards];
+      const closest = copies.reduce((a, b) => Math.abs(b - scrollPos) < Math.abs(a - scrollPos) ? b : a);
+      const depthDelay = scattering ? (Math.abs(closest - scrollPos) * 50 + "ms") : "0ms";
       return {
         ...base,
         left: scattering ? p.x : baseX,
@@ -1028,8 +1031,11 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
       };
     }
 
-    // continuous scroll stack mode
-    const rel = i - scrollPos;
+    // continuous scroll stack mode (infinite wrap)
+    const total = CARDS_DATA.length;
+    const copies = [i, i + total, i - total];
+    const closest = copies.reduce((a, b) => Math.abs(b - scrollPos) < Math.abs(a - scrollPos) ? b : a);
+    const rel = closest - scrollPos;
     const dist = Math.abs(rel);
     const yOff = rel * CARD_PITCH;
 
@@ -1087,14 +1093,11 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
     return { ...base, visibility: "hidden", opacity: 0, zIndex: 5, pointerEvents: "none" };
   };
 
-  const nearestCard = Math.round(scrollPos);
-  const clampedCard = ((nearestCard % CARDS_DATA.length) + CARDS_DATA.length) % CARDS_DATA.length;
-
   return (
     <div className="relative w-screen h-[100dvh] min-h-[100dvh] overflow-hidden bg-white select-none" style={{ fontFamily: "Inter,sans-serif" }}>
       <div className="absolute top-0 left-0 right-0 flex justify-between items-center px-5 pt-4 z-[200] pointer-events-none">
         <span style={{ fontSize: 12, fontWeight: 500, color: "rgba(17,17,17,0.4)", letterSpacing: ".04em" }}>Drops \u2726</span>
-        <span style={{ fontSize: 11, color: "rgba(17,17,17,0.3)" }}>2.4k drops</span>
+        <span style={{ fontSize: 11, color: "rgba(17,17,17,0.3)" }}></span>
       </div>
 
       <div
@@ -1120,20 +1123,6 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
       </div>
 
       {mode === "stack" && (
-        <div className="absolute z-[100] pointer-events-none whitespace-nowrap"
-          style={{ bottom: 90, left: "50%", transform: "translateX(-50%)", fontSize: 10, color: "#aaa", fontFamily: "Inter,sans-serif" }}>
-          {clampedCard + 1} of {CARDS_DATA.length}
-        </div>
-      )}
-
-      {mode === "stack" && (
-        <div className="absolute z-[100] pointer-events-none whitespace-nowrap"
-          style={{ bottom: 74, left: "50%", transform: "translateX(-50%)", fontSize: 9, color: "#ccc", letterSpacing: ".04em", fontFamily: "Inter,sans-serif" }}>
-          double tap to scatter
-        </div>
-      )}
-
-      {mode === "stack" && gyro.supported && (
         <button
           onClick={(e) => { e.stopPropagation(); gyro.requestPermission(); }}
           className="absolute z-[100]"

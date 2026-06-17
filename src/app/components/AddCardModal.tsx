@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "motion/react";
-import { X, Image, Type, Sticker, ArrowRight, RotateCw, Camera, Trash2, Layers } from "lucide-react";
+import { X, Image, Type, Sticker, ArrowRight, RotateCw, Camera, Trash2, Layers, Video } from "lucide-react";
 import { MAX_CARDS, type UserCard } from "../data/defaults";
 // Using native button instead of shadcn Button to test rendering
 
-type Tab = "text" | "image" | "gif" | "sticker";
+type Tab = "text" | "image" | "gif" | "sticker" | "camera_gif";
 
 interface AddCardModalProps {
   onClose: () => void;
@@ -52,6 +52,14 @@ const STICKER_LIST = [
 
 function genId() { return crypto.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
+const STROKE_STYLES = [
+  { id: "none", label: "None", css: "" },
+  { id: "white", label: "White", css: "3px solid white" },
+  { id: "black", label: "Black", css: "3px solid #111" },
+  { id: "purple", label: "Purple", css: "3px solid #7B61FF, 0 0 8px #7B61FF40" },
+  { id: "yellow", label: "Yellow", css: "4px solid #FFCD29" },
+];
+
 export default function AddCardModal({ onClose, onPost, cardCount }: AddCardModalProps) {
   const [step, setStep] = useState<"creating" | "success">("creating");
   const [tab, setTab] = useState<Tab>("text");
@@ -69,6 +77,7 @@ export default function AddCardModal({ onClose, onPost, cardCount }: AddCardModa
   const [strokeWeightIdx, setStrokeWeightIdx] = useState(0);
   const [strokeColorIdx, setStrokeColorIdx] = useState(0);
   const [imagePreview, setImagePreview] = useState("");
+  const [imageBase64, setImageBase64] = useState("");
   const [stickerIdx, setStickerIdx] = useState(0);
   const [userName, setUserName] = useState("");
   const [userRole, setUserRole] = useState("");
@@ -82,6 +91,20 @@ export default function AddCardModal({ onClose, onPost, cardCount }: AddCardModa
 
   const [gifShots, setGifShots] = useState<string[]>([]);
   const [gifPreview, setGifPreview] = useState("");
+
+  // camera GIF state
+  const [camShots, setCamShots] = useState<string[]>([]);
+  const [camState, setCamState] = useState<"idle"|"ready"|"shooting"|"review"|"denied"|"unavailable">("idle");
+  const [camCountdown, setCamCountdown] = useState(0);
+  const [strokeIdx, setStrokeIdx] = useState(0);
+  const camTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fileToBase64 = (file: File): Promise<string> => new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload = () => res(reader.result as string);
+    reader.onerror = rej;
+    reader.readAsDataURL(file);
+  });
 
   const selEl = elements.find(e => e.id === selId) || null;
 
@@ -97,13 +120,67 @@ export default function AddCardModal({ onClose, onPost, cardCount }: AddCardModa
   }, []);
 
   const startCamera = async () => {
+    setCamState("idle");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
       streamRef.current = stream;
+      setCamState("ready");
       setShowCamera(true);
-    } catch { /* no camera */ }
+    } catch {
+      setCamState("denied");
+    }
   };
-  const stopCamera = () => { streamRef.current?.getTracks().forEach(t => t.stop()); setShowCamera(false); };
+  const stopCamera = () => {
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    setShowCamera(false);
+    setCamState("idle");
+    setCamShots([]);
+    if (camTimerRef.current) { clearInterval(camTimerRef.current); camTimerRef.current = null; }
+  };
+
+  const captureCamShot = () => {
+    if (!videoRef.current) return;
+    const c = document.createElement("canvas"); c.width = 320; c.height = 240;
+    c.getContext("2d")?.drawImage(videoRef.current!, 0, 0);
+    // mirror flip for front camera
+    const ctx = c.getContext("2d");
+    if (ctx) { ctx.translate(c.width, 0); ctx.scale(-1, 1); ctx.drawImage(videoRef.current!, 0, 0); }
+    return c.toDataURL("image/png");
+  };
+
+  const startCamShoot = () => {
+    setCamShots([]);
+    setCamState("shooting");
+    let count = 3;
+    setCamCountdown(count);
+    const timer = setInterval(() => {
+      count--;
+      setCamCountdown(count);
+      if (count <= 0) {
+        clearInterval(timer);
+        const shot = captureCamShot();
+        if (shot) {
+          const shots = [shot];
+          setCamShots(shots);
+          // capture 2 more with 1s delay
+          let idx = 1;
+          const t2 = setInterval(() => {
+            const s = captureCamShot();
+            if (s) {
+              shots.push(s);
+              setCamShots([...shots]);
+              idx++;
+              if (idx >= 3) {
+                clearInterval(t2);
+                setCamState("review");
+              }
+            }
+          }, 600);
+        }
+      }
+    }, 1000);
+    camTimerRef.current = timer;
+  };
 
   useEffect(() => {
     if (showCamera && videoRef.current && streamRef.current) videoRef.current.srcObject = streamRef.current;
@@ -127,9 +204,8 @@ export default function AddCardModal({ onClose, onPost, cardCount }: AddCardModa
       base.fontFamily = FONTS[fontIdx].family;
       base.strokeWidth = STROKE_SIZES[strokeWeightIdx];
       base.strokeColor = TEXT_COLORS[strokeColorIdx];
-    } else if (type === "image") {
-      if (!imagePreview) return;
-      base.imageData = imagePreview;
+    } else if (type === "image" || type === "gif") {
+      if (imageBase64) base.imageData = imageBase64;
       base.content = "📷";
     } else if (type === "sticker") {
       base.content = STICKER_LIST[stickerIdx].label;
@@ -201,13 +277,25 @@ export default function AddCardModal({ onClose, onPost, cardCount }: AddCardModa
 
   const handleSubmit = () => {
     if (isAtLimit) return;
+    const imageEl = elements.find(e => e.type === "image" || e.type === "gif");
+    const textEl = elements.find(e => e.type === "text");
+    const stickerEl = elements.find(e => e.type === "sticker");
+    const mainType = imageEl ? imageEl.type : stickerEl ? "sticker" : "text";
+    // camera GIF: use camShots as image data
+    const camImageData = camShots.length === 3 ? JSON.stringify(camShots) : undefined;
     const allText = elements.map(e => e.content).filter(Boolean).join(" | ") || "✦";
     const card: UserCard = {
       bg: currentTheme.id, quote: allText, handle: "@" + (userName || "you"),
-      type: "text", accentColor: currentTheme.id, cardSkin: currentTheme.id,
+      type: camShots.length === 3 ? "camera_gif" : mainType,
+      accentColor: currentTheme.id, cardSkin: currentTheme.id,
       id: genId(), userName, userRole, themeId: currentTheme.id,
+      imageData: imageEl?.imageData || camImageData,
+      stickerLabel: stickerEl?.content,
+      fontStyle: textEl?.fontFamily,
+      borderStyle: STROKE_STYLES[strokeIdx].id,
     };
     setSubmittedCard(card); onPost(card); setStep("success");
+    stopCamera();
   };
 
   const previewFontFamily = FONTS[fontIdx].family;
@@ -335,10 +423,11 @@ export default function AddCardModal({ onClose, onPost, cardCount }: AddCardModa
               )}
 
               {/* Tab bar */}
-              <div className="flex gap-1 bg-[rgba(17,17,17,0.04)] rounded-2xl p-1">
-                {([{ key: "text", label: "Text", icon: <Type size={16} /> },
-                   { key: "image", label: "Image", icon: <Image size={16} /> },
-                   { key: "sticker", label: "Sticker", icon: <Sticker size={16} /> }] as const).map(t => (
+              <div className="flex gap-1 bg-[rgba(17,17,17,0.04)] rounded-2xl p-1 overflow-x-auto">
+                {([{ key: "text", label: "Text", icon: <Type size={13} /> },
+                   { key: "image", label: "Image", icon: <Image size={13} /> },
+                   { key: "camera_gif", label: "Camera", icon: <Camera size={13} /> },
+                   { key: "sticker", label: "Sticker", icon: <Sticker size={13} /> }] as const).map(t => (
                   <button key={t.key} onClick={() => setTab(t.key)}
                     className="flex-1 h-10 rounded-xl flex items-center justify-center gap-1.5 text-xs font-medium transition-all"
                     style={{ background: tab === t.key ? "#fff" : "transparent", color: tab === t.key ? "#7B61FF" : "rgba(17,17,17,0.5)", boxShadow: tab === t.key ? "0 1px 4px rgba(0,0,0,0.08)" : "none" }}
@@ -398,8 +487,12 @@ export default function AddCardModal({ onClose, onPost, cardCount }: AddCardModa
 
               {tab === "image" && (
                 <div className="space-y-3">
-                  <input ref={fileRef} type="file" accept="image/*" onChange={e => {
-                    const f = e.target.files?.[0]; if (f) { setImagePreview(URL.createObjectURL(f)); }
+                  <input ref={fileRef} type="file" accept="image/*" onChange={async e => {
+                    const f = e.target.files?.[0]; if (!f) return;
+                    setImagePreview(URL.createObjectURL(f));
+                    const reader = new FileReader();
+                    reader.onload = () => setImageBase64(reader.result as string);
+                    reader.readAsDataURL(f);
                   }} className="hidden" />
                   <div className="flex gap-2">
                     <button onClick={() => fileRef.current?.click()} className="flex-1 h-16 rounded-2xl border-2 border-dashed border-[rgba(17,17,17,0.12)] flex items-center justify-center gap-2 text-sm text-[rgba(17,17,17,0.4)] hover:border-[#7B61FF] hover:text-[#7B61FF] transition-colors">
@@ -423,6 +516,52 @@ export default function AddCardModal({ onClose, onPost, cardCount }: AddCardModa
                 </div>
               )}
 
+              {tab === "camera_gif" && (
+                <div className="space-y-3">
+                  {!showCamera && camState === "idle" && (
+                    <button onClick={startCamera} className="w-full h-24 rounded-2xl border-2 border-dashed border-[rgba(17,17,17,0.12)] flex items-center justify-center gap-2 text-sm text-[rgba(17,17,17,0.4)] hover:border-[#7B61FF] hover:text-[#7B61FF] transition-colors">
+                      <Camera size={18} /> Start camera
+                    </button>
+                  )}
+                  {camState === "denied" && (
+                    <div className="text-center py-6 text-sm text-[rgba(17,17,17,0.4)]">
+                      Camera unavailable. Try uploading a photo instead.
+                    </div>
+                  )}
+                  {showCamera && camState === "ready" && (
+                    <div className="relative rounded-2xl overflow-hidden bg-black">
+                      <video ref={videoRef} autoPlay playsInline muted className="w-full h-48 object-cover" style={{ transform: "scaleX(-1)" }} />
+                      <button onClick={startCamShoot} className="absolute bottom-3 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full bg-white/80 flex items-center justify-center border-2 border-white hover:bg-white transition-colors">
+                        <div className="w-9 h-9 rounded-full bg-white border-2 border-[#111]" />
+                      </button>
+                    </div>
+                  )}
+                  {camState === "shooting" && (
+                    <div className="text-center py-8">
+                      <div className="text-5xl font-bold text-[#7B61FF] mb-2">{camCountdown}</div>
+                      <p className="text-sm text-[rgba(17,17,17,0.4)]">Capturing shots...</p>
+                      <div className="flex justify-center gap-1 mt-4">
+                        {[0, 1, 2].map(i => (
+                          <div key={i} className="w-4 h-4 rounded-full" style={{ background: camShots[i] ? "#7B61FF" : "rgba(17,17,17,0.1)" }} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {camState === "review" && camShots.length === 3 && (
+                    <div>
+                      <div className="flex gap-2 overflow-x-auto pb-1">
+                        {camShots.map((s, i) => (
+                          <img key={i} src={s} alt={`shot ${i}`} className="w-24 h-18 rounded-xl object-cover flex-shrink-0" />
+                        ))}
+                      </div>
+                      <button onClick={startCamShoot} className="w-full h-10 rounded-2xl text-sm font-medium mt-2" style={{ background: "rgba(17,17,17,0.06)", color: "#111" }}>
+                        Retake
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {tab === "sticker" && (
                 <div className="space-y-3">
                   <div className="grid grid-cols-4 gap-2">
@@ -438,6 +577,23 @@ export default function AddCardModal({ onClose, onPost, cardCount }: AddCardModa
                   ><Sticker size={15} /> {selEl?.type === "sticker" ? "Update sticker" : "Add sticker"}</button>
                 </div>
               )}
+
+              {/* Stroke/border style */}
+              <div>
+                <p className="text-[10px] font-semibold text-[rgba(17,17,17,0.35)] uppercase mb-1.5">Border Style</p>
+                <div className="flex gap-1.5">
+                  {STROKE_STYLES.map((s, i) => (
+                    <button key={s.id} onClick={() => setStrokeIdx(i)}
+                      className="flex-1 h-9 rounded-xl text-[10px] font-medium transition-all"
+                      style={{
+                        background: strokeIdx === i ? "#7B61FF" : "rgba(17,17,17,0.05)",
+                        color: strokeIdx === i ? "#fff" : "rgba(17,17,17,0.5)",
+                        outline: s.css ? s.css : "none",
+                      }}
+                    >{s.label}</button>
+                  ))}
+                </div>
+              </div>
 
               {/* User info */}
               <div className="flex gap-2">

@@ -51,7 +51,7 @@ export interface UserCard {
   bg: string;
   quote: string;
   handle: string;
-  type: "text" | "image" | "gif" | "sticker";
+  type: "text" | "image" | "gif" | "sticker" | "camera_gif";
   imageData?: string;
   accentColor: string;
   moodBadge?: string;
@@ -64,4 +64,5 @@ export interface UserCard {
   userName?: string;
   userRole?: string;
   themeId?: string;
+  borderStyle?: string;
 }

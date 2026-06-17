@@ -73,19 +73,19 @@ function blurAmt(z: number) {
 // ── mobile layout constants ───────────────────────────────────────────────────
 
 const MOBILE_HEIGHTS = [400, 380, 420, 360, 370, 390, 375, 410, 385, 360, 395, 370, 405, 375, 415, 365, 380, 395, 400, 370, 385, 410, 390, 360];
-const CARD_W = 290;
+const CARD_W = 320;
 const PHONE_W = 390;
 const PHONE_H = 640;
 
-const SCATTER_POS = [
-  { x: 10, y: 50, r: -6 }, { x: 180, y: 30, r: 5 }, { x: -20, y: 220, r: -8 },
-  { x: 200, y: 180, r: 7 }, { x: 30, y: 380, r: -4 }, { x: 220, y: 340, r: 8 },
-  { x: -10, y: 490, r: -5 }, { x: 190, y: 480, r: 4 }, { x: 80, y: 130, r: 6 },
-  { x: 150, y: 280, r: -3 }, { x: 50, y: 300, r: 5 }, { x: 240, y: 120, r: -7 },
-  { x: 20, y: 160, r: 3 }, { x: 210, y: 260, r: -4 }, { x: 0, y: 350, r: 6 },
-  { x: 170, y: 420, r: -2 }, { x: 60, y: 200, r: -5 }, { x: 230, y: 400, r: 3 },
-  { x: -30, y: 130, r: 7 }, { x: 120, y: 450, r: -6 }, { x: 250, y: 200, r: 4 },
-  { x: 40, y: 100, r: -3 }, { x: 160, y: 360, r: 2 }, { x: 100, y: 250, r: -1 },
+const SCATTER_POS: { x: number; y: number; r: number; s: number }[] = [
+  { x: -50, y: 20, r: -8, s: 0.7 }, { x: 80, y: -10, r: 3, s: 0.9 }, { x: 200, y: 10, r: -4, s: 0.6 },
+  { x: -20, y: 160, r: 5, s: 0.8 }, { x: 120, y: 130, r: -2, s: 1.1 }, { x: 280, y: 100, r: 6, s: 0.7 },
+  { x: 300, y: 240, r: -6, s: 0.5 }, { x: -40, y: 300, r: 4, s: 0.9 }, { x: 100, y: 280, r: -5, s: 1.0 },
+  { x: 230, y: 350, r: 2, s: 0.6 }, { x: 50, y: 390, r: -7, s: 0.8 }, { x: 180, y: 420, r: 3, s: 1.2 },
+  { x: -10, y: 480, r: -3, s: 0.7 }, { x: 140, y: 530, r: 5, s: 0.5 }, { x: 290, y: 500, r: -4, s: 0.9 },
+  { x: 30, y: 560, r: 2, s: 0.6 }, { x: 220, y: 180, r: -1, s: 1.0 }, { x: 310, y: 380, r: 7, s: 0.8 },
+  { x: 160, y: 200, r: -5, s: 0.7 }, { x: 260, y: 60, r: 4, s: 0.6 }, { x: 340, y: 300, r: -3, s: 0.5 },
+  { x: 0, y: 250, r: -2, s: 0.9 }, { x: 350, y: 150, r: 6, s: 0.7 }, { x: 70, y: 450, r: -8, s: 0.8 },
 ];
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -819,19 +819,34 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // smooth snap to nearest card
+  // smooth snap to nearest card (infinite wrap)
   const snapToNearest = (from: number) => {
+    const total = CARDS_DATA.length;
     const nearest = Math.round(from);
     const start = from;
     const diff = nearest - start;
     const dur = 300;
-    if (Math.abs(diff) < 0.01) { setScrollPos(nearest); return; }
+    if (Math.abs(diff) < 0.01) {
+      // wrap around
+      let p = nearest;
+      if (p < 0) p += total;
+      if (p >= total) p -= total;
+      if (p !== nearest) { setScrollPos(p); }
+      return;
+    }
     const t0 = performance.now();
     const animate = (now: number) => {
       const dt = Math.min((now - t0) / dur, 1);
       const e = 1 - Math.pow(1 - dt, 3);
       setScrollPos(start + diff * e);
       if (dt < 1) rafRef.current = requestAnimationFrame(animate);
+      else {
+        // wrap after animation completes
+        let p = start + diff;
+        if (p < 0) p += total;
+        if (p >= total) p -= total;
+        setScrollPos(p);
+      }
     };
     cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(animate);
@@ -981,25 +996,35 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
 
     if (mode === "scatter") {
       const p = SCATTER_POS[i % SCATTER_POS.length];
+      const cardScale = p.s * scatterScale;
+      const depthDelay = scattering ? (Math.abs(i - scrollPos) * 50 + "ms") : "0ms";
       return {
         ...base,
-        left: p.x,
-        top: p.y,
-        transform: [
-          "translateX(" + (panX + gyro.offsetX) + "px)",
-          "translateY(" + gyro.offsetY + "px)",
-          "scale(" + scatterScale + ")",
-          "rotate(" + p.r + "deg)",
-        ].join(" "),
+        left: scattering ? p.x : baseX,
+        top: scattering ? p.y : baseY,
+        transform: scattering
+          ? [
+              "translateX(" + (panX + gyro.offsetX) + "px)",
+              "translateY(" + gyro.offsetY + "px)",
+              "scale(" + cardScale + ")",
+              "rotate(" + p.r + "deg)",
+            ].join(" ")
+          : [
+              "perspective(900px)",
+              "rotateX(" + gyro.rotateX + "deg)",
+              "rotateY(" + gyro.rotateY + "deg)",
+              "translateY(" + (i - scrollPos) * 70 + "px)",
+              "scale(1)",
+            ].join(" "),
         transformOrigin: "center center",
         opacity: 1,
-        zIndex: 10 + i,
+        zIndex: scattering ? 10 + i : 50 - Math.round(Math.abs(i - scrollPos)),
         visibility: "visible",
         pointerEvents: "auto",
         transition: scattering
-          ? "transform 560ms cubic-bezier(.34,1.2,.64,1), opacity 420ms ease, left 560ms cubic-bezier(.34,1.2,.64,1), top 560ms cubic-bezier(.34,1.2,.64,1)"
+          ? "transform 560ms cubic-bezier(.34,1.2,.64,1), left 560ms cubic-bezier(.34,1.2,.64,1), top 560ms cubic-bezier(.34,1.2,.64,1)"
           : "none",
-        transitionDelay: scattering ? (i * 25 + "ms") : "0ms",
+        transitionDelay: depthDelay,
       };
     }
 
@@ -1073,7 +1098,7 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
       </div>
 
       <div
-        className="absolute inset-0 flex items-center justify-center pb-[88px]"
+        className="absolute inset-0 flex items-center justify-center pb-[60px]"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

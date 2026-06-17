@@ -362,6 +362,21 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
   const [hintVisible, setHintVisible] = useState(true);
   const [counter, setCounter] = useState(1);
 
+  // ── spacing / zoom controls ──
+  const [showControls, setShowControls] = useState(false);
+  const [spread, setSpread] = useState(0.6);
+  const [depthGap, setDepthGap] = useState(500);
+  const [zoom, setZoom] = useState(1.2);
+  const spreadRef = useRef(spread);
+  const depthGapRef = useRef(depthGap);
+  const zoomRef = useRef(zoom);
+  spreadRef.current = spread;
+  depthGapRef.current = depthGap;
+  zoomRef.current = zoom;
+  // computed center of POS
+  const centerX = POS.reduce((s, [x]) => s + x, 0) / POS.length;
+  const centerY = POS.reduce((s, [, y]) => s + y, 0) / POS.length;
+
   useEffect(() => {
     const canvas = canvasRef.current;
     const wrap = wrapRef.current;
@@ -375,6 +390,8 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
       mode: "scatter" as "scatter" | "card",
       panX: 0, panY: 0, tPanX: 0, tPanY: 0,
       scrollZ: 0, targetScrollZ: 0,
+      spread: spreadRef.current, cx: centerX, cy: centerY,
+      depthGap: depthGapRef.current, zoom: zoomRef.current,
       hoveredIndex: null as number | null,
       isDown: false, holdActive: false,
       holdTimer: null as ReturnType<typeof setTimeout> | null,
@@ -389,6 +406,7 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
       el: HTMLDivElement;
       bx: number; by: number; bz: number; rot: number;
       w: number; h: number; bg: string;
+      nx: number; ny: number; // normalized POS (0-1)
     };
 
     const cards: TCard[] = [];
@@ -401,9 +419,13 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
         const [px, py] = POS[pi];
         const jx = (rng(l * 50 + i) - .5) * 80;
         const jy = (rng(l * 50 + i + 1) - .5) * 55;
-        const bx = px * vw - w / 2 + jx;
-        const by = py * vh - h / 2 + jy;
-        const bz = -l * DEPTH;
+        // compute base position with spread applied
+        const sp = s.spread;
+        const spPx = (px - s.cx) * sp + s.cx;
+        const spPy = (py - s.cy) * sp + s.cy;
+        const bx = spPx * vw - w / 2 + jx;
+        const by = spPy * vh - h / 2 + jy;
+        const bz = -l * s.depthGap;
         const rot = ROTS[(l * 7 + i) % ROTS.length];
         const light = isLightBg(data.bg);
         const textColor = light ? "rgba(17,17,17,0.9)" : "#fff";
@@ -426,25 +448,37 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
           }
         });
         canvas.appendChild(el);
-        cards.push({ el, bx, by, bz, rot, w, h, bg: data.bg });
+        cards.push({ el, bx, by, bz, rot, w, h, bg: data.bg, nx: px, ny: py });
       }
     }
 
     const drawScatter = () => {
-      const loop = LAYERS * DEPTH;
-      cards.forEach(({ el, bx, by, bz, rot }, idx) => {
-        const rx = bx + s.panX;
-        const ry = by + s.panY;
-        let z = ((bz + s.scrollZ) % loop + loop) % loop;
+      const sp = spreadRef.current;
+      const dg = depthGapRef.current;
+      const zm = zoomRef.current;
+      s.spread = sp; s.depthGap = dg; s.zoom = zm;
+      const loop = LAYERS * dg;
+      cards.forEach(({ el, nx, ny, w, h, rot }, idx) => {
+        // compute current position from spread + normalized coords
+        const spPx = (nx - s.cx) * sp + s.cx;
+        const spPy = (ny - s.cy) * sp + s.cy;
+        const cBx = spPx * vw - w / 2;
+        const cBy = spPy * vh - h / 2;
+        const layer = Math.floor(idx / CARDS_DATA.length);
+        const cBz = -layer * dg;
+        const rx = cBx + s.panX;
+        const ry = cBy + s.panY;
+        let z = ((cBz + s.scrollZ) % loop + loop) % loop;
         if (z > loop * .78) z = z - loop;
-        const far = -DEPTH * (LAYERS - 1) - 200;
+        const far = -dg * (LAYERS - 1) - 200;
         const near = 460;
         const t = (z - far) / (near - far);
-        const baseScale = Math.max(.04, .20 + t * .92);
+        const baseScale = Math.max(.04, (.20 + t * .92) * zm);
         const hoverScale = s.hoveredIndex === idx ? 1.08 : 1;
         const finalScale = baseScale * hoverScale;
         const op = Math.max(0, Math.min(1, t * 1.9 - .15));
-        if (z < -4200 || z > 680) { el.style.visibility = "hidden"; return; }
+        const zLimit = dg * LAYERS * 1.2;
+        if (z < -zLimit || z > 680) { el.style.visibility = "hidden"; return; }
         el.style.visibility = "visible";
         el.style.opacity = String(op);
         el.style.zIndex = String(Math.round(z + 6000));
@@ -660,6 +694,69 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
         }}>
         <Plus size={18} color="#111" />
       </button>
+
+      {/* Spacing controls toggle */}
+      <button
+        onClick={() => setShowControls(p => !p)}
+        className="absolute bottom-5 left-5 flex items-center justify-center z-[100] transition-transform hover:scale-110 active:scale-95"
+        style={{
+          height: 38, paddingInline: 14,
+          borderRadius: 19,
+          background: "rgba(17,17,17,0.08)",
+          border: "1px solid rgba(17,17,17,0.15)",
+          backdropFilter: "blur(12px)",
+          color: "#111",
+          fontSize: 10,
+          fontFamily: "Inter,sans-serif",
+          letterSpacing: ".05em",
+        }}>
+        {showControls ? "✕" : "◉ Controls"}
+      </button>
+
+      {/* Control panel */}
+      {showControls && (
+        <div
+          className="absolute z-[200]"
+          style={{
+            bottom: 64, left: 20,
+            background: "rgba(255,255,255,0.95)",
+            border: "1px solid rgba(17,17,17,0.12)",
+            borderRadius: 16,
+            padding: "16px 20px",
+            backdropFilter: "blur(20px)",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
+            fontFamily: "Inter,sans-serif",
+            minWidth: 220,
+          }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "#111", marginBottom: 12, letterSpacing: ".04em" }}>
+            Spacing & Zoom
+          </div>
+          {[
+            { label: "Spread", val: spread, set: setSpread, min: 0.2, max: 1.5, step: 0.05, ref: spreadRef },
+            { label: "Depth", val: depthGap, set: setDepthGap, min: 200, max: 1200, step: 50, ref: depthGapRef },
+            { label: "Zoom", val: zoom, set: setZoom, min: 0.5, max: 2.5, step: 0.05, ref: zoomRef },
+          ].map(({ label, val, set, min, max, step }) => (
+            <div key={label} style={{ marginBottom: 10 }}>
+              <div style={{
+                display: "flex", justifyContent: "space-between",
+                fontSize: 10, color: "rgba(17,17,17,0.5)", marginBottom: 4,
+              }}>
+                <span>{label}</span>
+                <span style={{ fontWeight: 600, color: "#111" }}>{val}</span>
+              </div>
+              <input
+                type="range"
+                min={min}
+                max={max}
+                step={step}
+                value={val}
+                onChange={e => set(parseFloat(e.target.value))}
+                style={{ width: "100%", accentColor: "#7B61FF" }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

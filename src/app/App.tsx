@@ -794,7 +794,7 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
 
 // ── Mobile Stack View ─────────────────────────────────────────────────────────
 
-function MobileView({ onAdd }: { onAdd: () => void }) {
+function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?: (i: number) => void }) {
   const [mode, setMode] = useState<"stack" | "scatter">("stack");
   const [scrollPos, setScrollPos] = useState(0);
   const [panX, setPanX] = useState(0);
@@ -942,6 +942,8 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
       return;
     }
     if (e.touches.length === 1) {
+      // skip single-finger if pinch is in progress
+      if (pinchStartDistanceRef.current !== null) return;
       const touch = e.touches[0];
       if (mode === "scatter") {
         pan.current = { active: true, lastX: touch.clientX };
@@ -960,6 +962,9 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
     if (pinchStartDistanceRef.current !== null) {
       pinchStartDistanceRef.current = null;
       pinchTriggeredRef.current = false;
+      drag.current.active = false;
+      pan.current.active = false;
+      return; // don't snap after pinch
     }
     if (mode === "scatter") { pan.current.active = false; return; }
     if (!drag.current.active) return;
@@ -1136,7 +1141,11 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
       >
         <div className="relative flex h-[520px] w-full items-center justify-center">
           {CARDS_DATA.map((card, i) => (
-            <div key={i} style={getStyle(i)}>
+            <div
+              key={i}
+              style={getStyle(i)}
+              onClick={mode === "scatter" ? (e) => { e.stopPropagation(); onCardSelect?.(i); } : undefined}
+            >
               <CardFace quote={card.quote} handle={card.handle} bg={card.bg} />
             </div>
           ))}
@@ -1279,7 +1288,7 @@ export default function App() {
   return (
     <div className="w-full h-full" style={{ fontFamily: "Inter, sans-serif" }}>
       {isMobile
-        ? <MobileView onAdd={() => setShowModal(true)} />
+        ? <MobileView onAdd={() => setShowModal(true)} onCardSelect={(i) => setSelectedCardIndex(i)} />
         : <DesktopView onAdd={() => setShowModal(true)} onCardSelect={(i) => setSelectedCardIndex(i)} />
       }
 

@@ -799,6 +799,7 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
   const [scrollPos, setScrollPos] = useState(0);
   const [panX, setPanX] = useState(0);
   const [scattering, setScattering] = useState(false);
+  const [scatterPhase, setScatterPhase] = useState(0); // 0=done, 1=start, 2=animate
   const rafRef = useRef<number>(0);
 
   // pinch state
@@ -856,7 +857,20 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
   const tap = useRef({ count: 0, timer: null as ReturnType<typeof setTimeout> | null });
   const pan = useRef({ active: false, lastX: 0 });
 
-  const CARD_PITCH = 70;
+  const CARD_PITCH = 25;
+
+  // scatter launch animation effect
+  useEffect(() => {
+    if (scattering) {
+      setScatterPhase(1); // start: render at stack position, no transition
+      const id = requestAnimationFrame(() => {
+        setScatterPhase(2); // animate: move to scatter positions with transition
+      });
+      return () => cancelAnimationFrame(id);
+    } else {
+      setScatterPhase(0); // done
+    }
+  }, [scattering]);
 
   const toggleMode = () => {
     if (mode === "stack") {
@@ -867,6 +881,7 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
       setScatterScale(1);
       setTimeout(() => setScattering(false), 700);
     } else {
+      setScattering(false);
       setMode("stack");
       setScatterScale(1);
       setScrollPos(0);
@@ -892,6 +907,7 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
 
   const onTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
+      cancelAnimationFrame(rafRef.current);
       pinchStartDistanceRef.current = getTouchDistance(e.touches);
       pinchStartScaleRef.current = scatterScale;
       pinchTriggeredRef.current = false;
@@ -917,6 +933,7 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
         setScatterScale(nextScale);
         if (diff > 20 && !pinchTriggeredRef.current) {
           pinchTriggeredRef.current = true;
+          cancelAnimationFrame(rafRef.current);
           setMode("stack");
           setScatterScale(1);
           setScrollPos(0);
@@ -997,35 +1014,38 @@ function MobileView({ onAdd }: { onAdd: () => void }) {
     if (mode === "scatter") {
       const p = SCATTER_POS[i % SCATTER_POS.length];
       const cardScale = p.s * scatterScale;
-      const totalCards = CARDS_DATA.length;
-      const copies = [i, i + totalCards, i - totalCards];
-      const closest = copies.reduce((a, b) => Math.abs(b - scrollPos) < Math.abs(a - scrollPos) ? b : a);
-      const depthDelay = scattering ? (Math.abs(closest - scrollPos) * 50 + "ms") : "0ms";
+      const nearestCard = Math.round(scrollPos);
+      const depthDist = Math.min(Math.abs(i - nearestCard), 6);
+      const depthDelay = scatterPhase === 2 ? (depthDist * 50 + "ms") : "0ms";
+
+      // phase 0: scatter stable, no transition
+      // phase 1: just launched, cards at stack center, no transition
+      // phase 2: animate from stack center to scatter positions
+      const isAnimating = scatterPhase === 2;
+      const targetLeft = isAnimating || scatterPhase === 0 ? p.x : baseX;
+      const targetTop = isAnimating || scatterPhase === 0 ? p.y : baseY;
+
       return {
         ...base,
-        left: scattering ? p.x : baseX,
-        top: scattering ? p.y : baseY,
-        transform: scattering
-          ? [
-              "translateX(" + (panX + gyro.offsetX) + "px)",
-              "translateY(" + gyro.offsetY + "px)",
-              "scale(" + cardScale + ")",
-              "rotate(" + p.r + "deg)",
-            ].join(" ")
-          : [
-              "perspective(900px)",
-              "rotateX(" + gyro.rotateX + "deg)",
-              "rotateY(" + gyro.rotateY + "deg)",
-              "translateY(" + (i - scrollPos) * 70 + "px)",
-              "scale(1)",
-            ].join(" "),
+        left: targetLeft,
+        top: targetTop,
+        transform: [
+          "translateX(" + (panX + gyro.offsetX) + "px)",
+          "translateY(" + gyro.offsetY + "px)",
+          "scale(" + cardScale + ")",
+          "rotate(" + p.r + "deg)",
+        ].join(" "),
         transformOrigin: "center center",
         opacity: 1,
-        zIndex: scattering ? 10 + i : 50 - Math.round(Math.abs(i - scrollPos)),
+        zIndex: 10 + i,
         visibility: "visible",
         pointerEvents: "auto",
-        transition: scattering
-          ? "transform 560ms cubic-bezier(.34,1.2,.64,1), left 560ms cubic-bezier(.34,1.2,.64,1), top 560ms cubic-bezier(.34,1.2,.64,1)"
+        transition: isAnimating
+          ? [
+              "transform 560ms cubic-bezier(.34,1.2,.64,1)",
+              "left 560ms cubic-bezier(.34,1.2,.64,1)",
+              "top 560ms cubic-bezier(.34,1.2,.64,1)",
+            ].join(", ")
           : "none",
         transitionDelay: depthDelay,
       };

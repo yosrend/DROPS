@@ -26,11 +26,17 @@ interface CardElem {
 }
 
 const THEMES = [
-  { id: "glass", label: "Glass", style: { background: "linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.05) 100%)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.2)" } },
-  { id: "chrome", label: "Chrome", style: { background: "linear-gradient(135deg, #868686, #c0c0c0, #e8e8e8, #a0a0a0)" } },
-  { id: "heatmap", label: "Heatmap", style: { background: "linear-gradient(135deg, #ff006e, #f24822, #ffcd29)" } },
+  { id: "glass", label: "Glass", style: { backgroundImage: "url(/cards/card-glass.png)", backgroundSize: "cover", backgroundPosition: "center" } },
+  { id: "chrome", label: "Chrome", style: { backgroundImage: "url(/cards/card-chrome.png)", backgroundSize: "cover", backgroundPosition: "center" } },
+  { id: "heatmap", label: "Heatmap", style: { backgroundImage: "url(/cards/card-heatmap.png)", backgroundSize: "cover", backgroundPosition: "center" } },
   { id: "holographic", label: "Holo", style: { backgroundImage: "url(/cards/card-holographic.png)", backgroundSize: "cover", backgroundPosition: "center" } },
-  { id: "normal", label: "Normal", style: { background: "#7B61FF" } },
+  { id: "blurry", label: "Blurry", style: { backgroundImage: "url(/cards/card-blurry.png)", backgroundSize: "cover", backgroundPosition: "center" } },
+  { id: "fractal", label: "Fractal", style: { backgroundImage: "url(/cards/card-fractal.png)", backgroundSize: "cover", backgroundPosition: "center" } },
+  { id: "frosted", label: "Frosted", style: { backgroundImage: "url(/cards/card-frosted%20glow.png)", backgroundSize: "cover", backgroundPosition: "center" } },
+  { id: "gradient", label: "Gradient", style: { backgroundImage: "url(/cards/card-gradient.png)", backgroundSize: "cover", backgroundPosition: "center" } },
+  { id: "halftone", label: "Halftone", style: { backgroundImage: "url(/cards/card-halftone.png)", backgroundSize: "cover", backgroundPosition: "center" } },
+  { id: "paper", label: "Paper", style: { backgroundImage: "url(/cards/card-paper.png)", backgroundSize: "cover", backgroundPosition: "center" } },
+  { id: "custom", label: "Custom", style: { background: "#7B61FF" } },
 ];
 
 const FONTS = [
@@ -338,7 +344,7 @@ export default function AddCardModal({ onClose, onPost, cardCount }: AddCardModa
                 {THEMES.map((t, i) => (
                   <div key={t.id} onClick={() => setThemeIdx(i)}
                     className="flex-shrink-0 w-20 h-20 rounded-2xl flex items-center justify-center text-[9px] font-medium snap-start cursor-pointer transition-all"
-                    style={{ ...t.style, outline: themeIdx === i ? "2px solid #7B61FF" : "2px solid transparent", outlineOffset: 2, color: t.id === "glass" ? "#111" : "#fff" }}
+                    style={{ ...t.style, outline: themeIdx === i ? "2px solid #7B61FF" : "2px solid transparent", outlineOffset: 2, color: t.id === "custom" ? "#111" : "#fff" }}
                   >{t.label}</div>
                 ))}
               </div>
@@ -346,10 +352,10 @@ export default function AddCardModal({ onClose, onPost, cardCount }: AddCardModa
               {/* Card canvas with layered elements */}
               <div className="flex justify-center">
                 <div className="relative overflow-hidden select-none"
-                  style={{ width: "min(100%, 280px)", aspectRatio: "7/10", borderRadius: 14, ...currentTheme.style, boxShadow: "0 8px 32px rgba(0,0,0,0.12)", touchAction: "none", color: currentTheme.id === "glass" ? "#111" : "#fff" }}
+                  style={{ width: "min(100%, 280px)", aspectRatio: "7/10", borderRadius: 14, ...currentTheme.style, boxShadow: "0 8px 32px rgba(0,0,0,0.12)", touchAction: "none", color: currentTheme.id === "custom" ? "#111" : "#fff" }}
                 >
                   {/* Name + role (always rendered) */}
-                  <div className={`absolute bottom-2 left-3 right-3 flex justify-between items-end z-[999] text-[9px] ${currentTheme.id === "glass" ? "text-[#111]" : "text-white/80"}`}>
+                  <div className={`absolute bottom-2 left-3 right-3 flex justify-between items-end z-[999] text-[9px] ${currentTheme.id === "custom" ? "text-[#111]" : "text-white/80"}`}>
                     <span className="font-medium">{userName || "name"}</span>
                     <span className="opacity-60 text-right">{userRole || "role"}</span>
                   </div>

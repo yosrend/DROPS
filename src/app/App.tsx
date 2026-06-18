@@ -1,13 +1,17 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Plus, X, ArrowRight } from "lucide-react";
+import { Plus, X, ArrowRight, Menu, QrCode, Users, Layers, HelpCircle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useGyroTilt } from "../hooks/useGyroTilt";
 import Onboarding from "./components/Onboarding";
 import AddCardModal from "./components/AddCardModal";
 import AdminPanel from "./components/AdminPanel";
 import { CardFace } from "./components/CardFace";
+import Toast from "./components/Toast";
+import MyDrops from "./components/MyDrops";
+import FriendList from "./components/FriendList";
+import QrScanner from "./components/QrScanner";
 import { ONBOARDING_KEY, CARDS_KEY, type UserCard } from "./data/defaults";
-import { getDrops, createDrop, toggleLike, getLikes, addReaction, getReactions, addComment, getComments, shareDropLink, shareWallLink } from "../services/dropsService";
+import { getDrops, createDrop, toggleLike, getLikes, addComment, getComments, shareDropLink, shareWallLink, getDropById } from "../services/dropsService";
 import { getDeviceId } from "../utils/device";
 
 // ── data ─────────────────────────────────────────────────────────────────────
@@ -392,7 +396,7 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
   }, []);
 
   return (
-    <div ref={wrapRef} className="relative w-full h-full overflow-hidden select-none" style={{ background: "#ffffff" }}>
+    <div ref={wrapRef} className="relative w-full h-full overflow-hidden select-none" style={{ background: "#000000" }}>
       {/* 3D stage */}
       <div className="absolute inset-0" style={{ perspective: "1000px", transformStyle: "preserve-3d" }}>
         <div ref={canvasRef} className="absolute inset-0" style={{ transformStyle: "preserve-3d" }} />
@@ -414,18 +418,19 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
         onClick={onAdd}
         className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center justify-center gap-2 z-[100] transition-all hover:scale-105 active:scale-95"
         style={{
-          height: 48, paddingInline: 24,
-          borderRadius: 24,
-          background: "#111",
+          height: 52, paddingInline: 24,
+          borderRadius: 26,
+          background: "rgba(255,255,255,0.12)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
           color: "#fff",
           fontFamily: "Inter,sans-serif",
-          fontSize: 13,
+          fontSize: 14,
           fontWeight: 500,
-          letterSpacing: ".02em",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.2), 0 0 0 0.5px rgba(255,255,255,0.08)",
         }}>
-        <Plus size={18} color="#fff" />
-        Drop your card
+        <Plus size={16} color="#fff" />
+        Create your drops
       </button>
     </div>
   );
@@ -937,7 +942,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
   };
 
   return (
-    <div className="relative w-screen h-[100dvh] min-h-[100dvh] overflow-hidden bg-white select-none" style={{ fontFamily: "Inter,sans-serif" }}>
+    <div className="relative w-screen h-[100dvh] min-h-[100dvh] overflow-hidden bg-black select-none" style={{ fontFamily: "Inter,sans-serif" }}>
       <div className="absolute top-0 left-0 right-0 flex justify-between items-center px-5 pt-4 z-[200] pointer-events-none">
         <span />
       </div>
@@ -983,7 +988,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
                   setOverlayFlipped(false);
                   longPressTimer.current = null;
                   try { navigator.vibrate?.(15); } catch {}
-                }, 600);
+                }, 300);
               }}
               onPointerUp={() => {
                 if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
@@ -992,7 +997,16 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
                 if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
               }}
             >
-              <CardFace quote={card.quote} handle={card.handle} bg={card.bg} />
+              <CardFace quote={card.quote} handle={card.handle} bg={card.bg}
+                themeId={(card as any).themeId}
+                dropId={(card as any).id}
+                displayName={(card as any).displayName}
+                profileUrl={(card as any).profileUrl}
+                qrEnabled={(card as any).qrEnabled}
+                userName={(card as any).userName}
+                fontStyle={(card as any).fontStyle}
+                type={(card as any).type}
+                stickerLabel={(card as any).stickerLabel} />
             </div>
           ))}
         </div>
@@ -1000,21 +1014,24 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
 
       <button
         onClick={e => { e.stopPropagation(); onAdd(); }}
-        className="absolute z-[200] flex items-center justify-center gap-2 transition-transform active:scale-95"
+        className="absolute z-[200] flex items-center justify-center gap-2 transition-transform active:scale-95 left-1/2 -translate-x-1/2"
         style={{
-          bottom: 28, right: 20,
-          height: 52, paddingInline: 20,
+          bottom: 28,
+          height: 52, paddingInline: 24,
           borderRadius: 26,
-          background: "#111",
+          background: "rgba(255,255,255,0.12)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
           color: "#fff",
-          fontSize: 13,
+          fontSize: 14,
           fontWeight: 500,
           fontFamily: "Inter,sans-serif",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.2), 0 0 0 0.5px rgba(255,255,255,0.08)",
           whiteSpace: "nowrap",
+          border: "none",
         }}>
         <Plus size={16} color="#fff" />
-        Leave your mark
+        Create your drops
       </button>
 
       {/* ── Long Press Overlay ── */}
@@ -1143,27 +1160,19 @@ function CardGalleryModal({
 }) {
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
-  const [reactions, setReactions] = useState<string[]>([]);
   const [comments, setComments] = useState<any[]>([]);
   const [commentText, setCommentText] = useState("");
   const [toast, setToast] = useState("");
-  const [floatingEmoji, setFloatingEmoji] = useState<string | null>(null);
   const did = getDeviceId();
 
   // load social data
   useEffect(() => {
     if (!card?.id) return;
     const load = async () => {
-      const likes = await toggleLike(card.id, did);
-      setLiked(false); setLikeCount(0); // reset — toggleLike was called check-only
-      const [l, r, cm] = await Promise.all([
-        getDrops ? Promise.resolve(0) : Promise.resolve(0),
-        getReactions(card.id),
-        getComments(card.id),
-      ]);
-      const allLikes = await getLikes(card.id);
-      setLikeCount(allLikes);
-      setComments(cm);
+      const likeCount = await getLikes(card.id);
+      setLiked(false); setLikeCount(likeCount);
+      const comments = await getComments(card.id);
+      setComments(comments);
     };
     load();
   }, [card?.id]);
@@ -1173,14 +1182,6 @@ function CardGalleryModal({
     const res = await toggleLike(card.id, did);
     setLiked(res.liked);
     setLikeCount(res.count);
-  };
-
-  const handleReaction = async (emoji: string) => {
-    if (!card?.id) return;
-    await addReaction(card.id, did, emoji);
-    setFloatingEmoji(emoji);
-    setTimeout(() => setFloatingEmoji(null), 1200);
-    setReactions(prev => [...prev, emoji]);
   };
 
   const handleComment = async () => {
@@ -1238,30 +1239,9 @@ function CardGalleryModal({
             style={{ color: liked ? "#F24822" : "rgba(17,17,17,0.4)" }}>
             {liked ? "❤️" : "🤍"} <span className="text-xs">{likeCount}</span>
           </button>
-          {/* Emoji reactions */}
-          {["🔥", "✨", "💜", "😂", "🙌"].map(e => (
-            <button key={e} onClick={() => handleReaction(e)}
-              className="transition-transform hover:scale-125 active:scale-150 text-sm">{e}</button>
-          ))}
           {/* Share */}
           <button onClick={handleShare} className="ml-auto text-xs text-[rgba(17,17,17,0.35)] underline">Share</button>
         </div>
-
-        {/* Floating emoji animation */}
-        {floatingEmoji && (
-          <div className="absolute pointer-events-none text-xl z-20"
-            style={{
-              left: "50%", top: "40%",
-              animation: "none",
-              transform: "translateX(-50%)",
-            }}>
-            <motion.div
-              initial={{ y: 0, opacity: 1, scale: 1 }}
-              animate={{ y: -60, opacity: 0, scale: 1.5 }}
-              transition={{ duration: 1, ease: "easeOut" }}
-            >{floatingEmoji}</motion.div>
-          </div>
-        )}
 
         {/* Comments */}
         <div className="px-4 pt-3 pb-2">
@@ -1317,11 +1297,41 @@ export default function App() {
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem(ONBOARDING_KEY) === "true");
   const [animated, setAnimated] = useState(() => localStorage.getItem("drops_animated") === "true");
 
+  // new screens
+  const [showMyDrops, setShowMyDrops] = useState(false);
+  const [showFriends, setShowFriends] = useState(false);
+  const [showQrScanner, setShowQrScanner] = useState(false);
+  const [showOnboardingMenu, setShowOnboardingMenu] = useState(false);
+  const [qrPreviewCard, setQrPreviewCard] = useState<UserCard | null>(null);
+
   // card state
   const [userCards, setUserCards] = useState<UserCard[]>([]);
   const [remoteCards, setRemoteCards] = useState<UserCard[]>([]);
   const [newCardId, setNewCardId] = useState<string | null>(null);
   const [deviceId] = useState(() => getDeviceId());
+
+  // seed sample data on ?seed
+  useEffect(() => {
+    if (window.location.search.includes("seed")) {
+      const samples: UserCard[] = [
+        { id: 'samp-001', bg: '#7B61FF', quote: 'Config 2025 was unreal!', handle: '@designer', type: 'text', accentColor: '#7B61FF', cardSkin: 'heatmap', fontStyle: 'Inter, system-ui, sans-serif', userName: 'Alex', userRole: 'Designer', themeId: 'heatmap', displayName: 'Alex Rivera', profileUrl: 'https://twitter.com/alexdesigns', qrEnabled: true },
+        { id: 'samp-002', bg: '#F24822', quote: 'Best community ever', handle: '@jun', type: 'sticker', stickerLabel: '✦', accentColor: '#F24822', cardSkin: 'holographic', userName: 'Jun', userRole: 'Developer', themeId: 'holographic', displayName: 'Jun Kim', profileUrl: 'https://github.com/junkim', qrEnabled: true },
+        { id: 'samp-003', bg: '#1ABCFE', quote: 'Pixel perfect ✦', handle: '@maya', type: 'text', accentColor: '#1ABCFE', cardSkin: 'frosted_glow', fontStyle: 'Georgia, serif', userName: 'Maya', userRole: 'PM', themeId: 'frosted_glow', displayName: 'Maya Chen', profileUrl: 'https://linkedin.com/in/mayachen', qrEnabled: true },
+      ];
+      const existing = JSON.parse(localStorage.getItem(CARDS_KEY) || '[]');
+      localStorage.setItem(CARDS_KEY, JSON.stringify([...existing, ...samples]));
+      // seed friends
+      const FRIENDS_KEY = 'drops_friends';
+      const friendSamples = [
+        { id: 'fr-s01', device_id: 'seed', friend_drop_id: 'ext-001', friend_name: 'Sarah M.', friend_handle: '@sarah_m', friend_profile_url: 'https://twitter.com/sarahm', friend_avatar_url: '', created_at: new Date().toISOString() },
+        { id: 'fr-s02', device_id: 'seed', friend_drop_id: 'ext-002', friend_name: 'Carlos UX', friend_handle: '@carlos_ux', friend_profile_url: 'https://dribbble.com/carlos', friend_avatar_url: '', created_at: new Date().toISOString() },
+      ];
+      const ef = JSON.parse(localStorage.getItem(FRIENDS_KEY) || '[]');
+      localStorage.setItem(FRIENDS_KEY, JSON.stringify([...ef, ...friendSamples]));
+      window.history.replaceState(null, '', '/');
+      window.location.reload();
+    }
+  }, []);
 
   // load drops on mount
   useEffect(() => {
@@ -1404,11 +1414,46 @@ export default function App() {
   }
 
   return (
-    <div className="w-full h-full dotted-bg" style={{ fontFamily: "Inter, sans-serif" }}>
+    <div className="w-full h-full" style={{ fontFamily: "Inter, sans-serif", background: "#000000" }}>
       {isMobile
         ? <MobileView key={userCards.length} onAdd={() => setShowModal(true)} onCardSelect={(i) => setSelectedCardIndex(i)} />
         : <DesktopView key={userCards.length} onAdd={() => setShowModal(true)} onCardSelect={(i) => setSelectedCardIndex(i)} />
       }
+
+      {/* Mobile menu bar */}
+      {isMobile && (
+        <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-[200] flex gap-2">
+          {[
+            { icon: <Layers size={14} />, label: "My Drops", onClick: () => setShowMyDrops(true) },
+            { icon: <QrCode size={14} />, label: "Scan", onClick: () => setShowQrScanner(true) },
+            { icon: <Users size={14} />, label: "Connect", onClick: () => setShowFriends(true) },
+            { icon: <HelpCircle size={14} />, label: "Help", onClick: () => setShowOnboardingMenu(true) },
+          ].map((btn, i) => (
+            <button key={i} onClick={btn.onClick}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-medium transition-all hover:scale-105"
+              style={{
+                background: "rgba(255,255,255,0.08)",
+                backdropFilter: "blur(12px)",
+                color: "rgba(255,255,255,0.7)",
+                border: "none",
+              }}>
+              {btn.icon} {btn.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* QR on hash — auto-open when ?drop=XXX */}
+      {isMobile && (() => {
+        const params = new URLSearchParams(window.location.search);
+        const dropId = params.get("drop");
+        if (dropId) {
+          getDropById(dropId).then(card => {
+            if (card) setTimeout(() => setQrPreviewCard(card), 500);
+          });
+        }
+        return null;
+      })()}
 
       <AnimatePresence>
         {showModal && (
@@ -1426,6 +1471,93 @@ export default function App() {
           onNext={() => setSelectedCardIndex(i => i !== null ? (i + 1) % combinedCards.length : null)}
         />
       )}
+
+      {/* New screens */}
+      {showMyDrops && <MyDrops onClose={() => setShowMyDrops(false)} onViewQr={(c) => { setQrPreviewCard(c); setShowMyDrops(false); }} />}
+      {showFriends && <FriendList onClose={() => setShowFriends(false)} />}
+      {showQrScanner && <QrScanner onClose={() => setShowQrScanner(false)} />}
+
+      {/* QR Preview overlay (standalone card flip) */}
+      {qrPreviewCard && (
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[9999] flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.8)", backdropFilter: "blur(24px)" }}
+          onClick={() => setQrPreviewCard(null)}
+        >
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0, y: 40 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 200, damping: 20 }}
+            className="relative"
+            style={{ width: 240, height: 340 }}
+            onClick={e => e.stopPropagation()}
+          >
+            <CardFace
+              quote={qrPreviewCard.quote}
+              handle={qrPreviewCard.handle}
+              bg={qrPreviewCard.bg}
+              themeId={qrPreviewCard.themeId}
+              dropId={qrPreviewCard.id}
+              displayName={qrPreviewCard.displayName}
+              profileUrl={qrPreviewCard.profileUrl}
+              qrEnabled={qrPreviewCard.qrEnabled ?? true}
+              userName={qrPreviewCard.userName}
+              fontStyle={qrPreviewCard.fontStyle}
+              type={qrPreviewCard.type}
+            />
+          </motion.div>
+          <button onClick={() => setQrPreviewCard(null)}
+            className="absolute top-6 right-6 flex items-center justify-center rounded-full"
+            style={{ width: 40, height: 40, background: "rgba(255,255,255,0.1)" }}>
+            <X size={16} color="#fff" />
+          </button>
+        </motion.div>
+      )}
+
+      {/* Onboarding help menu */}
+      {showOnboardingMenu && (
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          className="fixed inset-0 z-[9999] flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(16px)" }}
+          onClick={() => setShowOnboardingMenu(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }}
+            className="max-w-sm w-full mx-5 rounded-3xl p-6"
+            style={{ background: "rgba(255,255,255,0.06)" }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-semibold text-white mb-5" style={{ fontFamily: "Inter,sans-serif" }}>How DROPS works</h2>
+            <div className="flex flex-col gap-3">
+              {[
+                { icon: "✦", title: "Create a card", desc: "Tap the button and design your drop" },
+                { icon: "✎", title: "Customize", desc: "Pick a theme, font, color, sticker" },
+                { icon: "👆", title: "Explore", desc: "Stack, carousel, feed — tap twice to switch" },
+                { icon: "↻", title: "Flip to QR", desc: "Tap any card to see its QR code" },
+                { icon: "📷", title: "Scan & connect", desc: "Scan someone's QR to connect" },
+                { icon: "↗", title: "Share drops", desc: "Share your wall or individual drops" },
+              ].map((item, i) => (
+                <div key={i} className="flex gap-3 items-start">
+                  <span className="text-lg w-6 text-center">{item.icon}</span>
+                  <div>
+                    <p className="text-sm font-medium text-white">{item.title}</p>
+                    <p className="text-xs text-white/40">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setShowOnboardingMenu(false)}
+              className="w-full mt-6 py-4 rounded-2xl text-sm font-medium"
+              style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }}>
+              Got it
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
+
+      <Toast />
     </div>
   );
 }

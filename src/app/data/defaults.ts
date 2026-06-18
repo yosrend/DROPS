@@ -1,14 +1,9 @@
 export const MOOD_BADGES = [
-  "Mind blown",
-  "Inspired",
-  "Shipped it",
-  "I was there",
-  "First Config",
-  "Need coffee",
+  "Mind blown", "Inspired", "Shipped it", "I was there",
+  "First Config", "Need coffee",
 ] as const;
 
 export const CARD_SKINS = ["Paper", "Sticker", "Note", "Polaroid", "Pixel"] as const;
-
 export const CARD_SIZES = ["Small", "Medium", "Large"] as const;
 
 export const ACCENT_COLORS = [
@@ -21,30 +16,17 @@ export const ACCENT_COLORS = [
 ] as const;
 
 export const STICKERS = [
-  "I Was There",
-  "First Config",
-  "Online",
-  "IRL",
-  "Speaker",
-  "Builder",
-  "Designer",
-  "Developer",
-  "Community",
-  "Day 1",
-  "Day 2",
+  "I Was There", "First Config", "Online", "IRL", "Speaker",
+  "Builder", "Designer", "Developer", "Community", "Day 1", "Day 2",
 ] as const;
 
 export const STICKER_COLORS = [
-  "#7B61FF",
-  "#F24822",
-  "#1ABCFE",
-  "#FFCD29",
-  "#111111",
-  "#0FA958",
+  "#7B61FF", "#F24822", "#1ABCFE", "#FFCD29", "#111111", "#0FA958",
 ] as const;
 
 export const ONBOARDING_KEY = "drops_onboarding_completed";
 export const CARDS_KEY = "drops_user_cards";
+export const FRIENDS_KEY = "drops_friends";
 export const MAX_CARDS = 2;
 
 export interface UserCard {
@@ -65,4 +47,8 @@ export interface UserCard {
   userRole?: string;
   themeId?: string;
   borderStyle?: string;
+  // QR / connect fields
+  displayName?: string;
+  profileUrl?: string;
+  qrEnabled?: boolean;
 }

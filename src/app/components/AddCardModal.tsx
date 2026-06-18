@@ -154,6 +154,11 @@ export default function AddCardModal({ onClose, onPost, cardCount }: AddCardModa
   const [userRole, setUserRole] = useState("");
   const [footerColor, setFooterColor] = useState("#ffffff");
 
+  // Connect
+  const [displayName, setDisplayName] = useState("");
+  const [profileUrl, setProfileUrl] = useState("");
+  const [qrEnabled, setQrEnabled] = useState(true);
+
   // Image / sticker
   const [imagePreview, setImagePreview] = useState("");
   const [imageBase64, setImageBase64] = useState("");
@@ -209,6 +214,9 @@ export default function AddCardModal({ onClose, onPost, cardCount }: AddCardModa
       stickerLabel: tab === "sticker" ? STICKER_LIST[stickerIdx].e : undefined,
       fontStyle: FONT_OPTIONS[fontIdx].family,
       borderStyle: strokeWidth > 0 ? "custom" : "none",
+      displayName: displayName || undefined,
+      profileUrl: profileUrl || undefined,
+      qrEnabled,
     };
     setSubmittedCard(card);
     onPost(card);
@@ -669,6 +677,39 @@ export default function AddCardModal({ onClose, onPost, cardCount }: AddCardModa
                           }
                         />
                         <ColorSwatches selected={footerColor} onSelect={setFooterColor} />
+                      </div>
+
+                      {/* Divider */}
+                      <div className="w-full h-px" style={{ background: "#c6c6c8" }} />
+
+                      {/* Display Name */}
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between py-3">
+                          <p className="font-normal text-[17px] text-black">Display Name</p>
+                        </div>
+                        <div className="bg-white rounded-[12px] overflow-hidden">
+                          <input value={displayName} onChange={e => setDisplayName(e.target.value)}
+                            placeholder="Your display name" maxLength={40}
+                            className="w-full px-5 py-5 text-[17px] outline-none bg-transparent text-black placeholder:text-[rgba(60,60,67,0.3)] tracking-[-0.4px]" />
+                        </div>
+                      </div>
+
+                      {/* Profile URL */}
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between py-3">
+                          <p className="font-normal text-[17px] text-black">Profile / Social URL</p>
+                        </div>
+                        <div className="bg-white rounded-[12px] overflow-hidden">
+                          <input value={profileUrl} onChange={e => setProfileUrl(e.target.value)}
+                            placeholder="https://" maxLength={200}
+                            className="w-full px-5 py-5 text-[17px] outline-none bg-transparent text-black placeholder:text-[rgba(60,60,67,0.3)] tracking-[-0.4px]" />
+                        </div>
+                      </div>
+
+                      {/* QR toggle */}
+                      <div className="flex items-center justify-between py-3">
+                        <p className="font-normal text-[17px] text-black">Show QR on card</p>
+                        <IosToggle on={qrEnabled} onToggle={() => setQrEnabled(p => !p)} />
                       </div>
                     </>
                   )}

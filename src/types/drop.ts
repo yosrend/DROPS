@@ -15,6 +15,12 @@ export interface DropPost {
   user_name?: string | null;
   user_role?: string | null;
   theme_id?: string | null;
+  display_name?: string | null;
+  handle?: string | null;
+  profile_url?: string | null;
+  connect_url?: string | null;
+  qr_enabled?: boolean;
+  metadata?: Record<string, any> | null;
   x_position: number;
   y_position: number;
   z_index: number;
@@ -40,5 +46,29 @@ export interface DropInput {
   user_name?: string;
   user_role?: string;
   theme_id?: string;
+  display_name?: string;
+  handle?: string;
+  profile_url?: string;
+  qr_enabled?: boolean;
   image_file?: File;
+}
+
+export interface FriendRecord {
+  id: string;
+  device_id: string;
+  friend_drop_id: string;
+  friend_name: string;
+  friend_handle?: string;
+  friend_profile_url?: string;
+  friend_avatar_url?: string;
+  created_at: string;
+}
+
+export interface FriendInput {
+  device_id: string;
+  friend_drop_id: string;
+  friend_name: string;
+  friend_handle?: string;
+  friend_profile_url?: string;
+  friend_avatar_url?: string;
 }

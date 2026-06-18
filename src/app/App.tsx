@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Plus, X, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useGyroTilt } from "../hooks/useGyroTilt";
@@ -12,6 +12,8 @@ import { getDeviceId } from "../utils/device";
 
 // ── data ─────────────────────────────────────────────────────────────────────
 
+const CARD_THEMES = ["chrome","heatmap","holographic","blurry","fractal","frosted_glow","gradient","halftone","paper"];
+
 const CARDS_DATA = [
   { bg: "#7B61FF", quote: "Figma just changed everything. Again.", handle: "@devstudio" },
   { bg: "#F24822", quote: "The energy in that room was unreal.", handle: "@carlos_ux" },
@@ -23,6 +25,16 @@ const CARDS_DATA = [
   { bg: "#8338ec", quote: "See you at Config 2026.", handle: "@thomas" },
   { bg: "#ff006e", quote: "This changed how I think about design.", handle: "@nina" },
   { bg: "#3a86ff", quote: "First Config. Not the last.", handle: "@alex" },
+  { bg: "#7B61FF", quote: "Drop your card.", handle: "@drops" },
+  { bg: "#F24822", quote: "Config 2025 — we were here.", handle: "@wei" },
+  { bg: "#1ABCFE", quote: "Infinite possibilities.", handle: "@aisha" },
+  { bg: "#111111", quote: "The future is collaborative.", handle: "@leena" },
+  { bg: "#FFCD29", quote: "Pixel perfect.", handle: "@raj" },
+  { bg: "#F5F0E8", quote: "Design without borders.", handle: "@taylor" },
+  { bg: "#0FA958", quote: "Keep building.", handle: "@jordan" },
+  { bg: "#8338ec", quote: "Bold moves only.", handle: "@sam" },
+  { bg: "#ff006e", quote: "Innovate or stagnate.", handle: "@zoe" },
+  { bg: "#3a86ff", quote: "Dream big. Build bigger.", handle: "@mia" },
 ];
 
 const CARD_STYLES = [
@@ -173,11 +185,11 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
         [-vw, 0, vw].forEach((xOff) => {
           [-vh, 0, vh].forEach((yOff) => {
             const el = document.createElement("div");
-            el.style.cssText = `position:absolute;border-radius:10px;overflow:hidden;user-select:none;will-change:transform,filter,opacity;backface-visibility:hidden;display:flex;flex-direction:column;justify-content:space-between;width:${w}px;height:${h}px;background:${data.bg};left:${bx + xOff}px;top:${by + yOff}px;box-shadow:0 8px 32px rgba(0,0,0,0.35);font-family:Inter,sans-serif;`;
+            const themeImg = CARD_THEMES[(l * CARDS_DATA.length + i) % CARD_THEMES.length];
+            el.style.cssText = `position:absolute;border-radius:10px;overflow:hidden;user-select:none;will-change:transform,filter,opacity;backface-visibility:hidden;display:flex;flex-direction:column;justify-content:space-between;width:${w}px;height:${h}px;background:url(/cards/card-${themeImg}.png) center/cover no-repeat;left:${bx + xOff}px;top:${by + yOff}px;box-shadow:0 8px 32px rgba(0,0,0,0.35);font-family:Inter,sans-serif;`;
             el.innerHTML = `
-              <div style="font-size:14px;font-weight:700;color:${textColor};line-height:1.3;padding:14px 14px 0;flex:1;display:flex;align-items:center">${data.quote}</div>
-              <div style="font-size:10px;color:${mutedColor};padding:0 14px 14px">${data.handle}</div>
-              <div style="position:absolute;top:12px;right:12px;width:5px;height:5px;border-radius:50%;background:${light ? "rgba(17,17,17,0.25)" : "rgba(255,255,255,0.6)"}"></div>
+              <div style="font-size:14px;font-weight:700;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,0.3);line-height:1.3;padding:14px 14px 0;flex:1;display:flex;align-items:center">${data.quote}</div>
+              <div style="font-size:10px;color:rgba(255,255,255,0.7);padding:0 14px 14px">${data.handle}</div>
             `;
             el.dataset.cardIndex = String(logicalIdx);
             el.addEventListener("mouseenter", () => { s.hoveredIndex = logicalIdx; });
@@ -288,6 +300,9 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
     const tick = () => {
       s.panX += (s.tPanX - s.panX) * .10;
       s.panY += (s.tPanY - s.panY) * .10;
+      // wrap panY for infinite vertical scroll
+      if (s.panY > vh * 0.5) { s.panY -= vh; s.tPanY -= vh; }
+      if (s.panY < -vh * 0.5) { s.panY += vh; s.tPanY += vh; }
       s.scrollZ += (s.targetScrollZ - s.scrollZ) * 0.04;
       if (s.mode === "scatter") drawScatter();
       s.rafId = requestAnimationFrame(tick);
@@ -383,12 +398,6 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
         <div ref={canvasRef} className="absolute inset-0" style={{ transformStyle: "preserve-3d" }} />
       </div>
 
-      {/* Logo */}
-      <div className="absolute top-4 left-5 pointer-events-none z-10"
-        style={{ color: "rgba(17,17,17,0.4)", fontSize: 12, fontFamily: "Inter,sans-serif", fontWeight: 500, letterSpacing: ".04em" }}>
-        Drops ✦
-      </div>
-
       {/* Hint */}
       <div
         className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-none whitespace-nowrap z-10 transition-opacity duration-700"
@@ -398,12 +407,6 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
           fontFamily: "Inter,sans-serif", letterSpacing: ".12em", textTransform: "uppercase",
         }}>
         scroll · hold & drag
-      </div>
-
-      {/* Mode label */}
-      <div className="absolute top-4 right-5 pointer-events-none z-10"
-        style={{ color: "rgba(17,17,17,0.22)", fontSize: 10, fontFamily: "Inter,sans-serif", letterSpacing: ".1em", textTransform: "uppercase" }}>
-        {mode}
       </div>
 
       {/* Center FAB */}
@@ -424,14 +427,6 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
         <Plus size={18} color="#fff" />
         Drop your card
       </button>
-
-      {/* Admin & Animate links */}
-      <div className="absolute top-4 right-5 flex gap-2 z-[999]">
-        <button onClick={() => window.location.hash = "admin"}
-          className="text-[10px] text-[rgba(17,17,17,0.25)] hover:text-[rgba(17,17,17,0.5)] transition-colors underline">
-          Admin
-        </button>
-      </div>
     </div>
   );
 }
@@ -439,13 +434,19 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
 // ── Mobile Stack View ─────────────────────────────────────────────────────────
 
 function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?: (i: number) => void }) {
-  const [mode, setMode] = useState<"stack" | "carousel" | "scatter">("stack");
+  const [mode, setMode] = useState<"stack" | "carousel" | "scatter" | "feed">("stack");
   const [scrollPos, setScrollPos] = useState(0);
   const [scrollPosX, setScrollPosX] = useState(0);
   const [panX, setPanX] = useState(0);
-  const [anim, setAnim] = useState(false); // generic transition flag
-  const [animPhase, setAnimPhase] = useState(0); // 0=done, 1=start(no transition), 2=animating
+  const [anim, setAnim] = useState(false);
+  const [animPhase, setAnimPhase] = useState(0);
   const rafRef = useRef<number>(0);
+
+  // Long press → overlay
+  const [overlayCard, setOverlayCard] = useState<number | null>(null);
+  const [overlayFlipped, setOverlayFlipped] = useState(false);
+  const [overlayClosing, setOverlayClosing] = useState(false);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // pinch state
   const [scatterScale, setScatterScale] = useState(1);
@@ -499,7 +500,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
     rafRef.current = requestAnimationFrame(animate);
   };
 
-  const drag = useRef({ active: false, startX: 0, startY: 0, baseScroll: 0, baseScrollX: 0 });
+  const drag = useRef({ active: false, startX: 0, startY: 0, baseScroll: 0, baseScrollX: 0, baseScrollF: 0 });
   const tap = useRef({ count: 0, timer: null as ReturnType<typeof setTimeout> | null });
   const pan = useRef({ active: false, lastX: 0 });
 
@@ -517,20 +518,24 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
     }
   }, [anim]);
 
+  const [scrollFeed, setScrollFeed] = useState(0);
+
   const toggleMode = () => {
+    cancelAnimationFrame(rafRef.current);
+    setAnim(true);
+    setScatterScale(1);
     if (mode === "stack") {
-      cancelAnimationFrame(rafRef.current);
       setScrollPosX(scrollPos);
-      setAnim(true);
       setMode("carousel");
-      setScatterScale(1);
     } else if (mode === "carousel") {
-      cancelAnimationFrame(rafRef.current);
       setScrollPos(scrollPosX);
-      setAnim(true);
-      // animPhase will trigger: phase 1→stack starts at carousel pos, phase 2→animates
+      setScrollFeed(Math.round(scrollPosX));
+      setMode("feed");
+    } else if (mode === "feed") {
+      setAnim(false);
       setMode("stack");
-      setScatterScale(1);
+      setScrollPos(Math.round(scrollFeed));
+      setScrollFeed(0);
     } else {
       setAnim(false);
       setMode("stack");
@@ -603,7 +608,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
       if (!drag.current.active) {
         drag.current = {
           active: true, startX: touch.clientX, startY: touch.clientY,
-          baseScroll: scrollPos, baseScrollX: scrollPosX,
+          baseScroll: scrollPos, baseScrollX: scrollPosX, baseScrollF: scrollFeed,
         };
       }
       if (mode === "stack") {
@@ -634,11 +639,12 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
     drag.current.active = false;
     if (mode === "stack") snapToNearest(scrollPos, setScrollPos);
     else if (mode === "carousel") snapToNearest(scrollPosX, setScrollPosX);
+    else if (mode === "feed") snapToNearest(scrollFeed, setScrollFeed);
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (mode === "scatter") { pan.current = { active: true, lastX: e.clientX }; return; }
-    drag.current = { active: true, startX: e.clientX, startY: e.clientY, baseScroll: scrollPos, baseScrollX: scrollPosX };
+    drag.current = { active: true, startX: e.clientX, startY: e.clientY, baseScroll: scrollPos, baseScrollX: scrollPosX, baseScrollF: scrollFeed };
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -656,6 +662,10 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
       const dx = e.clientX - drag.current.startX;
       cancelAnimationFrame(rafRef.current);
       setScrollPosX(drag.current.baseScrollX - dx / CAROUSEL_PITCH);
+    } else if (mode === "feed") {
+      const dy = e.clientY - drag.current.startY;
+      cancelAnimationFrame(rafRef.current);
+      setScrollFeed(drag.current.baseScrollF - dy / 250);
     }
   };
 
@@ -665,12 +675,13 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
     drag.current.active = false;
     if (mode === "stack") snapToNearest(scrollPos, setScrollPos);
     else if (mode === "carousel") snapToNearest(scrollPosX, setScrollPosX);
+    else if (mode === "feed") snapToNearest(scrollFeed, setScrollFeed);
   };
 
   const getStyle = (i: number): React.CSSProperties => {
     const h = MOBILE_HEIGHTS[i];
     const baseX = (vp.w - CARD_W) / 2;
-    const baseY = (vp.h - h) / 2 - 20;
+    const baseY = (vp.h - h) / 2 - 90;
     const card = CARDS_DATA[i];
     const total = CARDS_DATA.length;
 
@@ -678,7 +689,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
       position: "absolute",
       width: CARD_W,
       height: h,
-      background: card.bg,
+      background: `url(/cards/card-${CARD_THEMES[i % CARD_THEMES.length]}.png) center/cover no-repeat`,
       borderRadius: 14,
       overflow: "hidden",
       display: "flex",
@@ -687,6 +698,41 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
       boxShadow: "0 4px 24px rgba(0,0,0,0.12)",
       fontFamily: "Inter,sans-serif",
     };
+
+    // ── Feed mode (vertical scroll, card centered, infinite) ──
+    if (mode === "feed") {
+      const FEED_GAP = 16;
+      const cardH = MOBILE_HEIGHTS[i] || 457;
+      // Infinite scroll: find closest virtual copy
+      const copies = [i, i + total, i - total];
+      const closest = copies.reduce((a, b) => Math.abs(b - scrollFeed) < Math.abs(a - scrollFeed) ? b : a);
+      const rel = closest - scrollFeed;
+      const yPos = rel * (cardH + FEED_GAP);
+      const startY = (vp.h - cardH) / 2 - 70;
+      const dist = Math.abs(rel);
+      const scale = dist < 0.5 ? 1 : Math.max(0.85, 1 - (dist - 0.5) * 0.08);
+      const op = dist < 1 ? 1 : Math.max(0.3, 1 - (dist - 1) * 0.3);
+      return {
+        position: "absolute",
+        width: CARD_W,
+        height: cardH,
+        background: `url(/cards/card-${CARD_THEMES[i % CARD_THEMES.length]}.png) center/cover no-repeat`,
+        borderRadius: 14,
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        boxShadow: "0 4px 24px rgba(0,0,0,0.12)",
+        fontFamily: "Inter,sans-serif",
+        left: baseX,
+        top: startY,
+        transform: `translateY(${yPos}px) scale(${scale})`,
+        transition: drag.current.active ? "none" : "transform 600ms cubic-bezier(0.22, 1, 0.36, 1)",
+        opacity: op,
+        zIndex: dist < 0.5 ? 50 : Math.max(5, 50 - dist * 5),
+        pointerEvents: (dist < 0.5 ? "auto" : "none") as React.CSSProperties["pointerEvents"],
+      };
+    }
 
     // ── Scatter mode ──
     if (mode === "scatter") {
@@ -893,8 +939,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
   return (
     <div className="relative w-screen h-[100dvh] min-h-[100dvh] overflow-hidden bg-white select-none" style={{ fontFamily: "Inter,sans-serif" }}>
       <div className="absolute top-0 left-0 right-0 flex justify-between items-center px-5 pt-4 z-[200] pointer-events-none">
-        <span style={{ fontSize: 12, fontWeight: 500, color: "rgba(17,17,17,0.4)", letterSpacing: ".04em" }}>Drops \u2726</span>
-        <span style={{ fontSize: 11, color: "rgba(17,17,17,0.3)" }}></span>
+        <span />
       </div>
 
       <div
@@ -915,7 +960,37 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
             <div
               key={i}
               style={getStyle(i)}
-              onClick={mode === "scatter" ? (e) => { e.stopPropagation(); onCardSelect?.(i); } : undefined}
+              onClick={mode === "scatter" || mode === "feed" ? (e) => { e.stopPropagation(); onCardSelect?.(i); } : undefined}
+              onPointerDown={(e) => {
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const onMove = (ev: PointerEvent) => {
+                  if (Math.abs(ev.clientX - startX) > 5 || Math.abs(ev.clientY - startY) > 5) {
+                    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+                    window.removeEventListener("pointermove", onMove);
+                    window.removeEventListener("pointerup", onUp);
+                  }
+                };
+                const onUp = () => {
+                  if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+                  window.removeEventListener("pointermove", onMove);
+                  window.removeEventListener("pointerup", onUp);
+                };
+                window.addEventListener("pointermove", onMove);
+                window.addEventListener("pointerup", onUp);
+                longPressTimer.current = setTimeout(() => {
+                  setOverlayCard(i);
+                  setOverlayFlipped(false);
+                  longPressTimer.current = null;
+                  try { navigator.vibrate?.(15); } catch {}
+                }, 600);
+              }}
+              onPointerUp={() => {
+                if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+              }}
+              onPointerLeave={() => {
+                if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+              }}
             >
               <CardFace quote={card.quote} handle={card.handle} bg={card.bg} />
             </div>
@@ -941,6 +1016,110 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
         <Plus size={16} color="#fff" />
         Leave your mark
       </button>
+
+      {/* ── Long Press Overlay ── */}
+      {overlayCard !== null && CARDS_DATA[overlayCard] && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: overlayClosing ? 0 : 1 }}
+          transition={{ duration: 0.35 }}
+          onAnimationComplete={() => { if (overlayClosing) { setOverlayCard(null); setOverlayFlipped(false); setOverlayClosing(false); } }}
+          className="fixed inset-0 z-[9999] flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(24px)" }}
+          onClick={() => setOverlayClosing(true)}
+        >
+          <motion.div
+            initial={{ scale: 0.5, rotateX: -90, opacity: 0, y: 200 }}
+            animate={overlayClosing ? { scale: 0.5, rotateX: -90, opacity: 0, y: 200 } : { scale: 1, rotateX: 0, opacity: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 150, damping: 16, duration: 0.7 }}
+            className="relative"
+            style={{ width: 280, height: 400, perspective: "1000px", transformOrigin: "center center" }}
+            onClick={e => e.stopPropagation()}
+          >
+            <motion.div
+              className="relative size-full"
+              style={{ transformStyle: "preserve-3d" }}
+              animate={{ rotateY: overlayFlipped ? 180 : 0 }}
+              transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+            >
+              {/* Front face */}
+              <div
+                className="absolute inset-0 overflow-hidden rounded-[18px] flex flex-col justify-between cursor-pointer"
+                style={{
+                  backfaceVisibility: "hidden",
+                  background: `url(/cards/card-${CARD_THEMES[overlayCard % CARD_THEMES.length]}.png) center/cover no-repeat`,
+                  boxShadow: "0 24px 80px rgba(0,0,0,0.4)",
+                }}
+                onClick={() => setOverlayFlipped(p => !p)}
+                onPointerDown={() => {
+                  let startX = 0;
+                  const handleDown = (e: PointerEvent) => { startX = e.clientX; };
+                  const handleMove = (e: PointerEvent) => {
+                    const diff = e.clientX - startX;
+                    if (diff > 15) setOverlayFlipped(true);
+                    else if (diff < -15) setOverlayFlipped(false);
+                  };
+                  const handleUp = () => {
+                    window.removeEventListener("pointerdown", handleDown);
+                    window.removeEventListener("pointermove", handleMove);
+                    window.removeEventListener("pointerup", handleUp);
+                  };
+                  window.addEventListener("pointerdown", handleDown);
+                  window.addEventListener("pointermove", handleMove);
+                  window.addEventListener("pointerup", handleUp);
+                }}
+              >
+                <div className="flex-1 flex items-center p-4">
+                  <p className="font-bold text-xl leading-tight break-words text-white"
+                    style={{ textShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
+                    {CARDS_DATA[overlayCard].quote}
+                  </p>
+                </div>
+                <div className="px-3 pb-3 flex justify-between items-end">
+                  <span className="text-xs font-medium text-white/80">{CARDS_DATA[overlayCard].handle}</span>
+                </div>
+              </div>
+
+              {/* Back face */}
+              <div
+                className="absolute inset-0 overflow-hidden rounded-[18px] flex flex-col items-center justify-center gap-3 cursor-pointer"
+                style={{
+                  backfaceVisibility: "hidden",
+                  transform: "rotateY(180deg)",
+                  background: "linear-gradient(135deg, #1a1a2e, #16213e, #0f3460)",
+                  boxShadow: "0 24px 80px rgba(0,0,0,0.4)",
+                }}
+                onClick={() => setOverlayFlipped(p => !p)}
+              >
+                <div className="text-5xl text-white/30">✦</div>
+                <p className="text-white/60 text-xs text-center px-6">
+                  {CARDS_DATA[overlayCard].quote}
+                </p>
+                <p className="text-white/30 text-[10px]">{CARDS_DATA[overlayCard].handle}</p>
+              </div>
+            </motion.div>
+
+            {/* Flip hint */}
+            <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 text-white/30 text-[10px] whitespace-nowrap">
+              hold & drag left/right to flip ↻
+            </div>
+          </motion.div>
+
+          {/* Close button */}
+          <button
+            onClick={() => setOverlayClosing(true)}
+            className="absolute top-6 right-6 flex items-center justify-center rounded-full transition-opacity hover:opacity-75"
+            style={{
+              width: 44, height: 44,
+              background: "rgba(255,255,255,0.15)",
+              backdropFilter: "blur(12px)",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
+            }}
+          >
+            <X size={18} color="#fff" />
+          </button>
+        </motion.div>
+      )}
     </div>
   );
 }
@@ -1216,9 +1395,9 @@ export default function App() {
   };
 
   // onboarding gate — must check before admin
-  const isAdmin = typeof window !== "undefined" && window.location.hash === "#admin";
+  const isAdmin = typeof window !== "undefined" && (window.location.pathname === "/admin" || window.location.hash === "#admin");
   if (isAdmin) {
-    return <AdminPanel onClose={() => { window.location.hash = ""; }} />;
+    return <AdminPanel onClose={() => { window.history.replaceState(null, "", "/"); }} />;
   }
   if (!onboarded) {
     return <Onboarding onComplete={() => setOnboarded(true)} />;

@@ -1,10 +1,122 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion } from "motion/react";
-import { X, Image, Type, Sticker, ArrowRight, RotateCw, Camera, Trash2, Layers, Video } from "lucide-react";
+import { X, Camera, Image as ImageIcon, ChevronDown, Type, Palette, PenTool, Paintbrush } from "lucide-react";
 import { MAX_CARDS, type UserCard } from "../data/defaults";
-// Using native button instead of shadcn Button to test rendering
 
-type Tab = "text" | "image" | "gif" | "sticker" | "camera_gif";
+function genId() { return crypto.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const THEMES = [
+  { id: "heatmap",      label: "Heatmap",  img: "/cards/card-heatmap.png",      light: false },
+  { id: "holographic",  label: "Holo",     img: "/cards/card-holographic.png",   light: false },
+  { id: "blurry",       label: "Blurry",   img: "/cards/card-blurry.png",        light: false },
+  { id: "fractal",      label: "Fractal",  img: "/cards/card-fractal.png",       light: false },
+  { id: "frosted_glow", label: "Frosted",  img: "/cards/card-frosted_glow.png",  light: false },
+  { id: "gradient",     label: "Gradient", img: "/cards/card-gradient.png",      light: true  },
+  { id: "chrome",       label: "Chrome",   img: "/cards/card-chrome.png",        light: false },
+  { id: "halftone",     label: "Halftone", img: "/cards/card-halftone.png",      light: false },
+  { id: "paper",        label: "Paper",    img: "/cards/card-paper.png",         light: true  },
+  { id: "custom",       label: "Custom",   img: null,                            light: false },
+];
+
+const FONT_OPTIONS = [
+  { id: "sans",  label: "Inter",     family: "Inter, system-ui, sans-serif" },
+  { id: "serif", label: "Serif",     family: "Georgia, serif" },
+  { id: "mono",  label: "Mono",      family: '"Courier New", monospace' },
+  { id: "beth",  label: "Beth Ellen",family: '"Beth Ellen", cursive' },
+];
+
+const DESIGN_COLORS = [
+  "#ff3b30", "#ff9500", "#ffcc00", "#4cd964", "#5ac8fa",
+  "#007aff", "#5856d6", "#ff2d55", "#000000", "#ffffff",
+];
+
+const STICKER_LIST = [
+  { id: "star", e: "⭐" }, { id: "heart", e: "❤️" }, { id: "fire", e: "🔥" },
+  { id: "sparkle", e: "✨" }, { id: "wave", e: "👋" }, { id: "rocket", e: "🚀" },
+  { id: "party", e: "🎉" }, { id: "rainbow", e: "🌈" }, { id: "crown", e: "👑" },
+  { id: "light", e: "💡" }, { id: "config", e: "✦" }, { id: "drops", e: "💧" },
+];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function getCardBg(themeId: string, customColor: string): React.CSSProperties {
+  const t = THEMES.find(t => t.id === themeId);
+  if (!t || !t.img) return { background: customColor };
+  return { backgroundImage: `url(${t.img})`, backgroundSize: "cover", backgroundPosition: "center" };
+}
+
+function isThemeLight(themeId: string): boolean {
+  return THEMES.find(t => t.id === themeId)?.light ?? false;
+}
+
+function swatchRing(active: boolean): React.CSSProperties {
+  return active ? { boxShadow: "0 0 0 2.5px #fff, 0 0 0 4.5px #007aff" } : {};
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function IosToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      className="relative shrink-0 h-[31px] w-[51px] rounded-[100px] overflow-hidden transition-colors duration-200"
+      style={{ background: on ? "#34c759" : "rgba(120,120,128,0.32)" }}
+    >
+      <div
+        className="absolute top-1/2 -translate-y-1/2 size-[27px] rounded-full bg-white transition-all duration-200"
+        style={{ right: on ? 2 : "auto", left: on ? "auto" : 2, boxShadow: "0 3px 8px rgba(0,0,0,0.15), 0 0 0 0.5px rgba(0,0,0,0.04)" }}
+      />
+    </button>
+  );
+}
+
+function ColorSwatches({ selected, onSelect }: { selected: string; onSelect: (c: string) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const isRainbow = !DESIGN_COLORS.includes(selected);
+  return (
+    <div className="flex flex-wrap gap-y-2 justify-between w-full">
+      {DESIGN_COLORS.map(c => (
+        <button
+          key={c}
+          onClick={() => onSelect(c)}
+          className="size-[28px] rounded-[14px] shrink-0 transition-transform hover:scale-105"
+          style={{
+            background: c,
+            border: c === "#ffffff" ? "1px solid rgba(0,0,0,0.12)" : "none",
+            ...swatchRing(selected === c),
+          }}
+        />
+      ))}
+      {/* Rainbow / custom picker */}
+      <label className="size-[28px] rounded-[14px] shrink-0 cursor-pointer overflow-hidden relative transition-transform hover:scale-105"
+        style={{ background: "conic-gradient(from 90deg, #ff0000, #ff9500, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)", ...swatchRing(isRainbow) }}>
+        <input ref={fileRef} type="color" value={isRainbow ? selected : "#007aff"}
+          onChange={e => onSelect(e.target.value)}
+          className="opacity-0 absolute w-0 h-0 pointer-events-none" />
+      </label>
+    </div>
+  );
+}
+
+function Divider() {
+  return <div className="w-full h-px shrink-0" style={{ background: "#c6c6c8" }} />;
+}
+
+function SectionRow({ icon, label, right }: { icon: React.ReactNode; label: string; right?: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between w-full">
+      <div className="flex items-center gap-3">
+        <span className="text-black">{icon}</span>
+        <span className="font-normal text-[17px] text-black leading-normal" style={{ fontFamily: "Inter, sans-serif" }}>{label}</span>
+      </div>
+      {right}
+    </div>
+  );
+}
+
+// ── Main Modal ────────────────────────────────────────────────────────────────
 
 interface AddCardModalProps {
   onClose: () => void;
@@ -12,657 +124,662 @@ interface AddCardModalProps {
   cardCount: number;
 }
 
-interface CardElem {
-  id: string;
-  type: "text" | "image" | "sticker";
-  x: number; y: number; w: number; h: number;
-  rotation: number; zIndex: number;
-  content: string;
-  imageData?: string;
-  color?: string;
-  fontFamily?: string;
-  strokeWidth?: number;
-  strokeColor?: string;
-}
-
-const THEMES = [
-  { id: "glass", label: "Glass", style: { backgroundImage: "url(/cards/card-glass.png)", backgroundSize: "cover", backgroundPosition: "center" } },
-  { id: "chrome", label: "Chrome", style: { backgroundImage: "url(/cards/card-chrome.png)", backgroundSize: "cover", backgroundPosition: "center" } },
-  { id: "heatmap", label: "Heatmap", style: { backgroundImage: "url(/cards/card-heatmap.png)", backgroundSize: "cover", backgroundPosition: "center" } },
-  { id: "holographic", label: "Holo", style: { backgroundImage: "url(/cards/card-holographic.png)", backgroundSize: "cover", backgroundPosition: "center" } },
-  { id: "blurry", label: "Blurry", style: { backgroundImage: "url(/cards/card-blurry.png)", backgroundSize: "cover", backgroundPosition: "center" } },
-  { id: "fractal", label: "Fractal", style: { backgroundImage: "url(/cards/card-fractal.png)", backgroundSize: "cover", backgroundPosition: "center" } },
-  { id: "frosted", label: "Frosted", style: { backgroundImage: "url(/cards/card-frosted%20glow.png)", backgroundSize: "cover", backgroundPosition: "center" } },
-  { id: "gradient", label: "Gradient", style: { backgroundImage: "url(/cards/card-gradient.png)", backgroundSize: "cover", backgroundPosition: "center" } },
-  { id: "halftone", label: "Halftone", style: { backgroundImage: "url(/cards/card-halftone.png)", backgroundSize: "cover", backgroundPosition: "center" } },
-  { id: "paper", label: "Paper", style: { backgroundImage: "url(/cards/card-paper.png)", backgroundSize: "cover", backgroundPosition: "center" } },
-  { id: "custom", label: "Custom", style: { background: "#7B61FF" } },
-];
-
-const FONTS = [
-  { id: "sans", label: "Sans", family: "Inter, sans-serif" },
-  { id: "serif", label: "Serif", family: "Georgia, serif" },
-  { id: "mono", label: "Mono", family: '"Courier New", monospace' },
-  { id: "hand", label: "Hand", family: '"Comic Sans MS", cursive' },
-];
-
-const TEXT_COLORS = ["#fff", "#111", "#7B61FF", "#F24822", "#1ABCFE", "#FFCD29", "#0FA958"];
-const STROKE_SIZES = [0, 1, 2, 3, 4];
-
-const STICKER_LIST = [
-  { id: "star", label: "⭐" }, { id: "heart", label: "❤️" }, { id: "fire", label: "🔥" },
-  { id: "sparkle", label: "✨" }, { id: "wave", label: "👋" }, { id: "rocket", label: "🚀" },
-  { id: "party", label: "🎉" }, { id: "rainbow", label: "🌈" }, { id: "crown", label: "👑" },
-  { id: "light", label: "💡" }, { id: "config", label: "✦" }, { id: "drops", label: "💧" },
-];
-
-function genId() { return crypto.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
-
-const STROKE_STYLES = [
-  { id: "none", label: "None", css: "" },
-  { id: "white", label: "White", css: "3px solid white" },
-  { id: "black", label: "Black", css: "3px solid #111" },
-  { id: "purple", label: "Purple", css: "3px solid #7B61FF, 0 0 8px #7B61FF40" },
-  { id: "yellow", label: "Yellow", css: "4px solid #FFCD29" },
-];
+type Tab = "text" | "image" | "sticker";
 
 export default function AddCardModal({ onClose, onPost, cardCount }: AddCardModalProps) {
   const [step, setStep] = useState<"creating" | "success">("creating");
   const [tab, setTab] = useState<Tab>("text");
-  const [themeIdx, setThemeIdx] = useState(4);
 
-  // elements in the card
-  const [elements, setElements] = useState<CardElem[]>([]);
-  const [selId, setSelId] = useState<string | null>(null);
-  const [nextZ, setNextZ] = useState(1);
+  // Theme
+  const [themeIdx, setThemeIdx] = useState(0);
+  const [customColor, setCustomColor] = useState("#7B61FF");
+  const currentTheme = THEMES[themeIdx];
+  const isCustom = currentTheme.id === "custom";
+  const cardBg = getCardBg(currentTheme.id, customColor);
 
-  // selected element editing state
+  // Card side
+  const [cardSide, setCardSide] = useState<"front" | "back">("front");
+
+  // Text settings
   const [textContent, setTextContent] = useState("");
   const [fontIdx, setFontIdx] = useState(0);
-  const [textColorIdx, setTextColorIdx] = useState(0);
-  const [strokeWeightIdx, setStrokeWeightIdx] = useState(0);
-  const [strokeColorIdx, setStrokeColorIdx] = useState(0);
+  const [fontColor, setFontColor] = useState("#ffffff");
+  const [strokeWidth, setStrokeWidth] = useState(0);
+  const [strokeColor, setStrokeColor] = useState("#ffffff");
+  const [showFontPicker, setShowFontPicker] = useState(false);
+
+  // Footer
+  const [showFooter, setShowFooter] = useState(true);
+  const [userName, setUserName] = useState("");
+  const [userRole, setUserRole] = useState("");
+  const [footerColor, setFooterColor] = useState("#ffffff");
+
+  // Image / sticker
   const [imagePreview, setImagePreview] = useState("");
   const [imageBase64, setImageBase64] = useState("");
   const [stickerIdx, setStickerIdx] = useState(0);
-  const [userName, setUserName] = useState("");
-  const [userRole, setUserRole] = useState("");
-
-  // camera
   const [showCamera, setShowCamera] = useState(false);
+  const [submittedCard, setSubmittedCard] = useState<UserCard | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const [submittedCard, setSubmittedCard] = useState<UserCard | null>(null);
-
-  const [gifShots, setGifShots] = useState<string[]>([]);
-  const [gifPreview, setGifPreview] = useState("");
-
-  // camera GIF state
-  const [camShots, setCamShots] = useState<string[]>([]);
-  const [camState, setCamState] = useState<"idle"|"ready"|"shooting"|"review"|"denied"|"unavailable">("idle");
-  const [camCountdown, setCamCountdown] = useState(0);
-  const [strokeIdx, setStrokeIdx] = useState(0);
-  const camTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const fileToBase64 = (file: File): Promise<string> => new Promise((res, rej) => {
-    const reader = new FileReader();
-    reader.onload = () => res(reader.result as string);
-    reader.onerror = rej;
-    reader.readAsDataURL(file);
-  });
-
-  const selEl = elements.find(e => e.id === selId) || null;
 
   const isAtLimit = cardCount >= MAX_CARDS;
-  const currentTheme = THEMES[themeIdx];
-
-  // drag element
-  const dragEl = useRef({ id: "", active: false, startX: 0, startY: 0, baseX: 0, baseY: 0 });
-  const resizeEl = useRef({ id: "", active: false, startX: 0, startY: 0, baseW: 0, baseH: 0, dir: "" });
-
-  const updateElement = useCallback((id: string, patch: Partial<CardElem>) => {
-    setElements(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e));
-  }, []);
-
-  const startCamera = async () => {
-    setCamState("idle");
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-      streamRef.current = stream;
-      setCamState("ready");
-      setShowCamera(true);
-    } catch {
-      setCamState("denied");
-    }
-  };
-  const stopCamera = () => {
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    setShowCamera(false);
-    setCamState("idle");
-    setCamShots([]);
-    if (camTimerRef.current) { clearInterval(camTimerRef.current); camTimerRef.current = null; }
-  };
-
-  const captureCamShot = () => {
-    if (!videoRef.current) return;
-    const c = document.createElement("canvas"); c.width = 320; c.height = 240;
-    c.getContext("2d")?.drawImage(videoRef.current!, 0, 0);
-    // mirror flip for front camera
-    const ctx = c.getContext("2d");
-    if (ctx) { ctx.translate(c.width, 0); ctx.scale(-1, 1); ctx.drawImage(videoRef.current!, 0, 0); }
-    return c.toDataURL("image/png");
-  };
-
-  const startCamShoot = () => {
-    setCamShots([]);
-    setCamState("shooting");
-    let count = 3;
-    setCamCountdown(count);
-    const timer = setInterval(() => {
-      count--;
-      setCamCountdown(count);
-      if (count <= 0) {
-        clearInterval(timer);
-        const shot = captureCamShot();
-        if (shot) {
-          const shots = [shot];
-          setCamShots(shots);
-          // capture 2 more with 1s delay
-          let idx = 1;
-          const t2 = setInterval(() => {
-            const s = captureCamShot();
-            if (s) {
-              shots.push(s);
-              setCamShots([...shots]);
-              idx++;
-              if (idx >= 3) {
-                clearInterval(t2);
-                setCamState("review");
-              }
-            }
-          }, 600);
-        }
-      }
-    }, 1000);
-    camTimerRef.current = timer;
-  };
 
   useEffect(() => {
     if (showCamera && videoRef.current && streamRef.current) videoRef.current.srcObject = streamRef.current;
   }, [showCamera]);
 
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+      streamRef.current = stream;
+      setShowCamera(true);
+    } catch {}
+  };
+
+  const stopCamera = () => {
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    setShowCamera(false);
+  };
+
   const capturePhoto = () => {
     if (!videoRef.current) return;
     const c = document.createElement("canvas"); c.width = 320; c.height = 240;
-    c.getContext("2d")?.drawImage(videoRef.current!, 0, 0);
+    c.getContext("2d")?.drawImage(videoRef.current, 0, 0);
     return c.toDataURL("image/png");
-  };
-
-  // Add element from tab content
-  const addElement = (type: CardElem["type"]) => {
-    const id = genId();
-    const base: CardElem = { id, type, x: 10, y: 10, w: 80, h: 50, rotation: 0, zIndex: nextZ, content: "" };
-    if (type === "text") {
-      if (!textContent.trim()) return;
-      base.content = textContent;
-      base.color = TEXT_COLORS[textColorIdx];
-      base.fontFamily = FONTS[fontIdx].family;
-      base.strokeWidth = STROKE_SIZES[strokeWeightIdx];
-      base.strokeColor = TEXT_COLORS[strokeColorIdx];
-    } else if (type === "image" || type === "gif") {
-      if (imageBase64) base.imageData = imageBase64;
-      base.content = "📷";
-    } else if (type === "sticker") {
-      base.content = STICKER_LIST[stickerIdx].label;
-    }
-    setElements(prev => [...prev, base]);
-    setSelId(id);
-    setNextZ(z => z + 1);
-  };
-
-  const removeElement = (id: string) => {
-    setElements(prev => prev.filter(e => e.id !== id));
-    if (selId === id) setSelId(null);
-  };
-
-  const bringToFront = (id: string) => {
-    setNextZ(z => z + 1);
-    updateElement(id, { zIndex: nextZ });
-  };
-
-  // Pointer handlers for drag
-  const onCardPointerDown = (e: React.PointerEvent, id: string) => {
-    e.stopPropagation();
-    setSelId(id);
-    const el = elements.find(ev => ev.id === id);
-    if (!el) return;
-    dragEl.current = { id, active: true, startX: e.clientX, startY: e.clientY, baseX: el.x, baseY: el.y };
-  };
-  const onCardPointerMove = (e: React.PointerEvent) => {
-    if (!dragEl.current.active) return;
-    updateElement(dragEl.current.id, {
-      x: dragEl.current.baseX + (e.clientX - dragEl.current.startX),
-      y: dragEl.current.baseY + (e.clientY - dragEl.current.startY),
-    });
-  };
-  const onCardPointerUp = () => { dragEl.current.active = false; };
-
-  // Resize handlers
-  const onResizeStart = (e: React.PointerEvent, id: string, dir: string) => {
-    e.stopPropagation();
-    const el = elements.find(ev => ev.id === id);
-    if (!el) return;
-    resizeEl.current = { id, active: true, startX: e.clientX, startY: e.clientY, baseW: el.w, baseH: el.h, dir };
-  };
-  const onResizeMove = (e: React.PointerEvent) => {
-    if (!resizeEl.current.active) return;
-    const dx = e.clientX - resizeEl.current.startX;
-    const dy = e.clientY - resizeEl.current.startY;
-    const dir = resizeEl.current.dir;
-    let nw = resizeEl.current.baseW, nh = resizeEl.current.baseH;
-    if (dir.includes("e")) nw = Math.max(15, resizeEl.current.baseW + dx * 0.4);
-    if (dir.includes("w")) nw = Math.max(15, resizeEl.current.baseW - dx * 0.4);
-    if (dir.includes("s")) nh = Math.max(15, resizeEl.current.baseH + dy * 0.4);
-    if (dir.includes("n")) nh = Math.max(15, resizeEl.current.baseH - dy * 0.4);
-    updateElement(resizeEl.current.id, { w: nw, h: nh });
-  };
-  const onResizeEnd = () => { resizeEl.current.active = false; };
-
-  // handle tab add vs edit
-  const handleTabAction = () => {
-    if (selEl?.type === tab) {
-      // update selected element
-      if (tab === "text") updateElement(selEl.id, { content: textContent, color: TEXT_COLORS[textColorIdx], fontFamily: FONTS[fontIdx].family, strokeWidth: STROKE_SIZES[strokeWeightIdx], strokeColor: TEXT_COLORS[strokeColorIdx] });
-      else if (tab === "image" && imagePreview) updateElement(selEl.id, { imageData: imagePreview });
-      else if (tab === "sticker") updateElement(selEl.id, { content: STICKER_LIST[stickerIdx].label });
-    } else {
-      addElement(tab);
-    }
   };
 
   const handleSubmit = () => {
     if (isAtLimit) return;
-    const imageEl = elements.find(e => e.type === "image" || e.type === "gif");
-    const textEl = elements.find(e => e.type === "text");
-    const stickerEl = elements.find(e => e.type === "sticker");
-    const mainType = imageEl ? imageEl.type : stickerEl ? "sticker" : "text";
-    // camera GIF: use camShots as image data
-    const camImageData = camShots.length === 3 ? JSON.stringify(camShots) : undefined;
-    const allText = elements.map(e => e.content).filter(Boolean).join(" | ") || "✦";
+    const bgValue = isCustom ? customColor : currentTheme.id;
+    const mainText = textContent.trim() || (tab === "sticker" ? STICKER_LIST[stickerIdx].e : "✦");
     const card: UserCard = {
-      bg: currentTheme.id, quote: allText, handle: "@" + (userName || "you"),
-      type: camShots.length === 3 ? "camera_gif" : mainType,
-      accentColor: currentTheme.id, cardSkin: currentTheme.id,
-      id: genId(), userName, userRole, themeId: currentTheme.id,
-      imageData: imageEl?.imageData || camImageData,
-      stickerLabel: stickerEl?.content,
-      fontStyle: textEl?.fontFamily,
-      borderStyle: STROKE_STYLES[strokeIdx].id,
+      bg: bgValue,
+      quote: mainText,
+      handle: "@" + (userName || "you"),
+      type: tab === "image" ? "image" : tab === "sticker" ? "sticker" : "text",
+      accentColor: bgValue,
+      cardSkin: bgValue,
+      id: genId(),
+      userName,
+      userRole,
+      themeId: currentTheme.id,
+      imageData: imageBase64 || undefined,
+      stickerLabel: tab === "sticker" ? STICKER_LIST[stickerIdx].e : undefined,
+      fontStyle: FONT_OPTIONS[fontIdx].family,
+      borderStyle: strokeWidth > 0 ? "custom" : "none",
     };
-    setSubmittedCard(card); onPost(card); setStep("success");
+    setSubmittedCard(card);
+    onPost(card);
+    setStep("success");
     stopCamera();
   };
 
-  const previewFontFamily = FONTS[fontIdx].family;
+  // ── Card Preview (right panel + compact mobile) ──────────────────────────
+  const CardPreview = ({ compact = false }: { compact?: boolean }) => {
+    const isFlipped = cardSide === "back";
+    // 30% larger: 280×400 → 364×520
+    const cW = compact ? 120 : 364;
+    const cH = compact ? 170 : 520;
+    return (
+      <motion.div
+        className="relative shrink-0"
+        style={{ width: cW, height: cH, perspective: "1000px" }}
+      >
+        <motion.div
+          className="relative size-full"
+          style={{ transformStyle: "preserve-3d" }}
+          animate={{ rotateY: isFlipped ? 180 : 0 }}
+          transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+        >
+          {/* ── Front face ── */}
+          <div
+            className="absolute inset-0 overflow-hidden rounded-[18px] flex flex-col justify-between"
+            style={{
+              backfaceVisibility: "hidden",
+              ...cardBg,
+              boxShadow: compact ? "0 4px 20px rgba(0,0,0,0.2)" : "0 12px 40px rgba(0,0,0,0.25)",
+            }}
+          >
+            <div className="flex-1 flex items-center p-4">
+              <p
+                className="font-bold leading-tight break-words"
+                style={{
+                  fontFamily: FONT_OPTIONS[fontIdx].family,
+                  color: fontColor,
+                  fontSize: compact ? 11 : 18,
+                  WebkitTextStroke: strokeWidth > 0 ? `${strokeWidth * 0.5}px ${strokeColor}` : undefined,
+                }}
+              >
+                {tab === "sticker"
+                  ? STICKER_LIST[stickerIdx].e
+                  : textContent || (compact ? "Your text" : "Start typing your message…")}
+              </p>
+            </div>
+
+            {/* Image preview overlay */}
+            {tab === "image" && imagePreview && (
+              <img src={imagePreview} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            )}
+
+            {/* Footer */}
+            {showFooter && (
+              <div className="px-3 pb-2 flex justify-between items-end">
+                <span className="text-[9px] font-medium" style={{ color: footerColor, fontSize: compact ? 7 : 10 }}>
+                  {userName || "Name"}
+                </span>
+                <span className="text-[8px] opacity-70" style={{ color: footerColor, fontSize: compact ? 6 : 9 }}>
+                  {userRole || "Role"}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* ── Back face ── */}
+          <div
+            className="absolute inset-0 overflow-hidden rounded-[18px] flex flex-col items-center justify-center gap-3"
+            style={{
+              backfaceVisibility: "hidden",
+              transform: "rotateY(180deg)",
+              background: "linear-gradient(135deg, #1a1a2e, #16213e, #0f3460)",
+              boxShadow: compact ? "0 4px 20px rgba(0,0,0,0.2)" : "0 12px 40px rgba(0,0,0,0.25)",
+            }}
+          >
+            <div className="text-4xl">✦</div>
+            <p className="text-white font-semibold text-lg">{userName || "Your Name"}</p>
+            <p className="text-white/60 text-xs">{userRole || "Your Role"}</p>
+            <div className="mt-2 px-4 py-1 rounded-full bg-white/10 text-white/50 text-[10px]">
+              {currentTheme.label} · {FONT_OPTIONS[fontIdx].label}
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    );
+  };
+
+  // ── Segmented Control ─────────────────────────────────────────────────────
+  const tabs: { key: Tab; label: string }[] = [
+    { key: "text", label: "Text" },
+    { key: "image", label: "Image" },
+    { key: "sticker", label: "Sticker" },
+  ];
+
+  if (step === "success" && submittedCard) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[500] flex items-end md:items-center justify-center"
+        style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)" }}
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+          transition={{ type: "spring", stiffness: 400, damping: 35 }}
+          className="w-full md:max-w-sm mx-auto bg-[#eeeeef] md:rounded-[28px] rounded-t-[28px] p-6 text-center relative overflow-hidden"
+          onClick={e => e.stopPropagation()}
+        >
+          {Array.from({ length: 20 }).map((_, i) => (
+            <motion.div key={i} className="absolute pointer-events-none rounded-full"
+              style={{ width: i % 3 === 0 ? 8 : 5, height: i % 3 === 0 ? 8 : 5, borderRadius: i % 2 === 0 ? "50%" : 2, background: ["#7B61FF", "#ff3b30", "#007aff", "#4cd964", "#fff"][i % 5], left: `${8 + (i * 4.4) % 84}%`, top: -10 }}
+              animate={{ y: [0, 260], x: [(i % 2 === 0 ? 1 : -1) * ((i * 7) % 35)], rotate: [0, 360], opacity: [1, 0] }}
+              transition={{ duration: 1.2 + (i % 4) * 0.2, delay: i * 0.07, ease: "easeIn" }}
+            />
+          ))}
+          <motion.div
+            className="mx-auto mb-5 relative overflow-hidden rounded-2xl flex flex-col justify-between"
+            style={{ width: 140, height: 200, ...cardBg, boxShadow: "0 16px 48px rgba(0,0,0,0.2)" }}
+            initial={{ scale: 0.7, rotate: -6, opacity: 0, y: 16 }}
+            animate={{ scale: 1, rotate: 3, opacity: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 280, damping: 18, delay: 0.1 }}
+          >
+            <div className="flex-1 flex items-center p-3">
+              <p className="font-bold text-sm leading-tight" style={{ color: fontColor, fontFamily: FONT_OPTIONS[fontIdx].family }}>
+                {submittedCard.quote}
+              </p>
+            </div>
+            {showFooter && (
+              <div className="px-3 pb-2 flex justify-between text-[8px]" style={{ color: footerColor }}>
+                <span>{userName || "Name"}</span>
+                <span className="opacity-70">{userRole || "Role"}</span>
+              </div>
+            )}
+          </motion.div>
+          <p className="text-[18px] font-semibold text-black mb-1" style={{ fontFamily: "Inter, sans-serif" }}>You left your mark ✦</p>
+          <p className="text-[14px] text-[rgba(60,60,67,0.6)]" style={{ fontFamily: "Inter, sans-serif" }}>Your card is now on the wall</p>
+          <button onClick={onClose}
+            className="mt-5 w-full h-12 rounded-2xl text-sm font-medium"
+            style={{ background: "rgba(120,120,128,0.12)", color: "#111", fontFamily: "Inter, sans-serif" }}>
+            Explore the wall
+          </button>
+        </motion.div>
+      </motion.div>
+    );
+  }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
-      className="fixed inset-0 z-[500] flex items-end md:items-center justify-center p-0 md:p-4"
-      style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[500] flex items-end md:items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(12px)" }}
       onClick={onClose}
     >
-      <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-        transition={{ type: "spring", stiffness: 400, damping: 35 }}
-        className="relative w-full md:max-w-[520px] max-h-[92vh] md:rounded-3xl rounded-t-3xl overflow-y-auto overflow-x-hidden bg-white"
-        style={{ fontFamily: "Inter, sans-serif" }}
+      {/* Slider CSS */}
+      <style>{`
+        .ios-slider { -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px; outline: none; cursor: pointer; background: transparent; width: 100%; }
+        .ios-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px; border-radius: 50%; background: white; box-shadow: 0 3px 8px rgba(0,0,0,0.2),0 0 0 0.5px rgba(0,0,0,0.06); cursor: pointer; }
+        .ios-slider::-moz-range-thumb { width: 28px; height: 28px; border-radius: 50%; background: white; box-shadow: 0 3px 8px rgba(0,0,0,0.2); cursor: pointer; border: none; }
+      `}</style>
+
+      <motion.div
+        initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+        transition={{ type: "spring", stiffness: 380, damping: 36 }}
+        className="w-full md:w-auto md:max-w-5xl flex md:flex-row flex-col md:rounded-[36px] rounded-t-[28px] overflow-hidden"
+        style={{ maxHeight: "96vh", height: "90vh" }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="sticky top-0 z-10 bg-white border-b border-black/5 px-5 pt-4 pb-3 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold text-[#111]">Drop your card</p>
-            <p className="text-[11px] text-[rgba(17,17,17,0.35)]">{cardCount} of {MAX_CARDS} cards</p>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center bg-black/5"><X size={14} color="rgba(17,17,17,0.5)" /></button>
-        </div>
+        {/* ── LEFT PANEL: Form ───────────────────────────────────────────── */}
+        <div
+          className="flex flex-col overflow-y-auto md:w-[380px] w-full"
+          style={{ background: "#eeeeef", fontFamily: "Inter, sans-serif" }}
+        >
+          <div className="flex flex-col gap-7 px-5 py-8">
 
-        <div className="p-4 space-y-4">
-          {step === "success" && submittedCard ? (
-            <SuccessView card={submittedCard} onClose={onClose} />
-          ) : isAtLimit ? (
-            <div className="text-center py-10"><div className="text-4xl mb-4">✨</div>
-              <p className="text-lg font-bold text-[#111]">You've dropped your mark</p>
-              <p className="text-sm text-[rgba(17,17,17,0.4)] mt-1">Come back and explore!</p>
-            </div>
-          ) : (
-            <>
-              {/* Theme carousel - swipe left/right */}
-              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none -mx-4 px-4 snap-x snap-mandatory"
-                style={{ scrollBehavior: "smooth" }}>
-                {THEMES.map((t, i) => (
-                  <div key={t.id} onClick={() => setThemeIdx(i)}
-                    className="flex-shrink-0 w-20 h-20 rounded-2xl flex items-center justify-center text-[9px] font-medium snap-start cursor-pointer transition-all"
-                    style={{ ...t.style, outline: themeIdx === i ? "2px solid #7B61FF" : "2px solid transparent", outlineOffset: 2, color: t.id === "custom" ? "#111" : "#fff" }}
-                  >{t.label}</div>
+            {/* Segmented Control */}
+            <div className="bg-[rgba(120,120,128,0.12)] h-[50px] relative rounded-[14px] shrink-0 w-full overflow-hidden">
+              <div className="flex items-center p-[3px] h-full gap-0">
+                {tabs.map(t => (
+                  <button
+                    key={t.key}
+                    onClick={() => setTab(t.key)}
+                    className="flex-1 h-full relative flex items-center justify-center rounded-[10px] transition-all"
+                    style={{ position: "relative" }}
+                  >
+                    {tab === t.key && (
+                      <span className="absolute inset-0 bg-white rounded-[10px] shadow-[0px_4px_12px_rgba(0,0,0,0.12),0px_4px_1.5px_rgba(0,0,0,0.04)]" />
+                    )}
+                    <span
+                      className="relative text-[17px] leading-[28px] text-center tracking-[-0.1px] whitespace-nowrap"
+                      style={{ fontWeight: tab === t.key ? 600 : 400 }}
+                    >
+                      {t.label}
+                    </span>
+                  </button>
                 ))}
               </div>
+            </div>
 
-              {/* Card canvas with layered elements */}
-              <div className="flex justify-center">
-                <div className="relative overflow-hidden select-none"
-                  style={{ width: "min(100%, 280px)", aspectRatio: "7/10", borderRadius: 14, ...currentTheme.style, boxShadow: "0 8px 32px rgba(0,0,0,0.12)", touchAction: "none", color: currentTheme.id === "custom" ? "#111" : "#fff" }}
-                >
-                  {/* Name + role (always rendered) */}
-                  <div className={`absolute bottom-2 left-3 right-3 flex justify-between items-end z-[999] text-[9px] ${currentTheme.id === "custom" ? "text-[#111]" : "text-white/80"}`}>
-                    <span className="font-medium">{userName || "name"}</span>
-                    <span className="opacity-60 text-right">{userRole || "role"}</span>
+            {isAtLimit ? (
+              <div className="text-center py-8">
+                <div className="text-4xl mb-3">✨</div>
+                <p className="text-lg font-semibold text-black">You've dropped your mark</p>
+                <p className="text-sm text-[rgba(60,60,67,0.6)] mt-1">Come back and explore!</p>
+              </div>
+            ) : (
+              <div className="flex flex-col flex-1" style={{ minHeight: 500 }}>
+                {/* ── TEXT TAB ─────────────────────────────────────────── */}
+                {tab === "text" && (
+                  <>
+                    {/* Text Input section */}
+                    <div className="flex flex-col gap-7">
+                      <div className="px-0">
+                        <div className="flex items-center justify-between py-3">
+                          <p className="font-semibold text-[22px] text-black leading-normal">Text Input</p>
+                        </div>
+                      </div>
+                      <textarea
+                        value={textContent}
+                        onChange={e => setTextContent(e.target.value)}
+                        placeholder="Hello, Nice 2 meet u!"
+                        maxLength={200}
+                        rows={4}
+                        className="w-full bg-white rounded-[18px] resize-none outline-none text-black placeholder:text-[rgba(60,60,67,0.3)]"
+                        style={{
+                          padding: "24px",
+                          fontSize: 20,
+                          fontWeight: 500,
+                          lineHeight: "26px",
+                          fontFamily: FONT_OPTIONS[fontIdx].family,
+                        }}
+                      />
+                    </div>
+
+                    {/* Font Settings section */}
+                    <div className="flex flex-col gap-0">
+                      <div className="py-3">
+                        <p className="font-semibold text-[22px] text-black leading-normal">Font Settings</p>
+                      </div>
+
+                      {/* Select Font row */}
+                      <div className="py-4 relative">
+                        <SectionRow
+                          icon={<Type size={20} />}
+                          label="Select Font"
+                          right={
+                            <button
+                              onClick={() => setShowFontPicker(p => !p)}
+                              className="flex items-center gap-1.5"
+                            >
+                              <span className="text-[17px] text-black" style={{ fontFamily: FONT_OPTIONS[fontIdx].family }}>
+                                {FONT_OPTIONS[fontIdx].label}
+                              </span>
+                              <ChevronDown size={10} color="black" />
+                            </button>
+                          }
+                        />
+                        {showFontPicker && (
+                          <div className="absolute right-0 top-full mt-1 bg-white rounded-2xl shadow-lg z-10 overflow-hidden min-w-[160px]">
+                            {FONT_OPTIONS.map((f, i) => (
+                              <button
+                                key={f.id}
+                                onClick={() => { setFontIdx(i); setShowFontPicker(false); }}
+                                className="w-full text-left px-4 py-3 text-[15px] hover:bg-[rgba(120,120,128,0.08)] transition-colors flex items-center justify-between"
+                                style={{ fontFamily: f.family, fontWeight: fontIdx === i ? 600 : 400 }}
+                              >
+                                {f.label}
+                                {fontIdx === i && <span className="text-[#007aff] text-xs">✓</span>}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <Divider />
+
+                      {/* Font Color */}
+                      <div className="flex flex-col gap-4 py-4">
+                        <SectionRow
+                          icon={<Palette size={20} />}
+                          label="Font Color"
+                          right={
+                            <div className="size-[28px] rounded-[14px] shrink-0"
+                              style={{ background: fontColor, border: fontColor === "#ffffff" ? "1px solid rgba(0,0,0,0.12)" : "none" }} />
+                          }
+                        />
+                        <ColorSwatches selected={fontColor} onSelect={setFontColor} />
+                      </div>
+
+                      <Divider />
+
+                      {/* Stroke Width */}
+                      <div className="flex flex-col gap-4 py-4">
+                        <SectionRow
+                          icon={<PenTool size={20} />}
+                          label="Stroke Width"
+                          right={<span className="text-[17px] text-[rgba(60,60,67,0.6)]">{strokeWidth}px</span>}
+                        />
+                        {/* iOS slider */}
+                        <div className="relative h-8 flex items-center">
+                          {/* Track */}
+                          <div className="absolute left-0 right-0 h-[4px] rounded-full" style={{ background: "#c6c6c8" }} />
+                          <div className="absolute left-0 h-[4px] rounded-full" style={{ background: "#007aff", width: `${(strokeWidth / 10) * 100}%` }} />
+                          <input
+                            type="range" min={0} max={10} step={1} value={strokeWidth}
+                            onChange={e => setStrokeWidth(Number(e.target.value))}
+                            className="ios-slider relative z-10"
+                          />
+                        </div>
+                        {/* Tick labels */}
+                        <div className="flex justify-between text-[10px] text-[rgba(60,60,67,0.6)]">
+                          {[0,1,2,3,4,5,6,7,8,9,10].map(n => <span key={n}>{n}</span>)}
+                        </div>
+                      </div>
+
+                      <Divider />
+
+                      {/* Stroke Color */}
+                      <div className="flex flex-col gap-4 py-4">
+                        <SectionRow
+                          icon={<Paintbrush size={20} />}
+                          label="Stroke Color"
+                          right={
+                            <div className="size-[28px] rounded-[14px] shrink-0"
+                              style={{ background: strokeColor, border: strokeColor === "#ffffff" ? "2px solid #c6c6c8" : "none" }} />
+                          }
+                        />
+                        <ColorSwatches selected={strokeColor} onSelect={setStrokeColor} />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* ── IMAGE TAB ─────────────────────────────────────────── */}
+                {tab === "image" && (
+                  <div className="flex flex-col gap-4">
+                    <p className="font-semibold text-[22px] text-black py-1">Image</p>
+                    <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={async e => {
+                      const f = e.target.files?.[0]; if (!f) return;
+                      setImagePreview(URL.createObjectURL(f));
+                      const reader = new FileReader();
+                      reader.onload = () => setImageBase64(reader.result as string);
+                      reader.readAsDataURL(f);
+                    }} />
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => fileRef.current?.click()}
+                        className="flex-1 h-[80px] bg-white rounded-[18px] flex flex-col items-center justify-center gap-2 text-[rgba(60,60,67,0.6)] hover:text-[#007aff] transition-colors"
+                      >
+                        <ImageIcon size={22} />
+                        <span className="text-[13px]">Gallery</span>
+                      </button>
+                      <button
+                        onClick={startCamera}
+                        className="flex-1 h-[80px] bg-white rounded-[18px] flex flex-col items-center justify-center gap-2 text-[rgba(60,60,67,0.6)] hover:text-[#007aff] transition-colors"
+                      >
+                        <Camera size={22} />
+                        <span className="text-[13px]">Camera</span>
+                      </button>
+                    </div>
+                    {imagePreview && (
+                      <div className="relative">
+                        <img src={imagePreview} alt="" className="w-full h-32 object-cover rounded-[18px]" />
+                        <button onClick={() => { setImagePreview(""); setImageBase64(""); }}
+                          className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/40 flex items-center justify-center">
+                          <X size={12} color="white" />
+                        </button>
+                      </div>
+                    )}
+                    {showCamera && (
+                      <div className="relative rounded-[18px] overflow-hidden bg-black">
+                        <video ref={videoRef} autoPlay playsInline className="w-full h-40 object-cover" style={{ transform: "scaleX(-1)" }} />
+                        <button
+                          onClick={() => { const d = capturePhoto(); if (d) { setImagePreview(d); setImageBase64(d); stopCamera(); } }}
+                          className="absolute bottom-3 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-white/80 flex items-center justify-center">
+                          <div className="w-9 h-9 rounded-full bg-white border-2 border-black" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── STICKER TAB ───────────────────────────────────────── */}
+                {tab === "sticker" && (
+                  <div className="flex flex-col gap-4">
+                    <p className="font-semibold text-[22px] text-black py-1">Sticker</p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {STICKER_LIST.map((s, i) => (
+                        <button key={s.id} onClick={() => setStickerIdx(i)}
+                          className="h-[60px] rounded-[18px] flex items-center justify-center text-2xl transition-all"
+                          style={{
+                            background: stickerIdx === i ? "rgba(0,122,255,0.1)" : "white",
+                            ...swatchRing(stickerIdx === i),
+                          }}>
+                          {s.e}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── SEPARATOR ─────────────────────────────────────────── */}
+                <div className="flex justify-center px-0 py-2">
+                  <div className="w-full h-px" style={{ background: "#c6c6c8" }} />
+                </div>
+
+                {/* ── FOOTER SECTION ────────────────────────────────────── */}
+                <div className="flex flex-col gap-6">
+                  {/* Footer toggle */}
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold text-[22px] text-black leading-normal">Footer</p>
+                    <IosToggle on={showFooter} onToggle={() => setShowFooter(p => !p)} />
                   </div>
 
-                  {/* Elements layer */}
-                  {elements.map(el => (
-                    <div key={el.id}
-                      className={`absolute rounded-xl cursor-move ${selId === el.id ? "ring-2 ring-[#7B61FF]" : ""}`}
-                      style={{ left: `${el.x}%`, top: `${el.y}%`, width: `${el.w}%`, height: `${el.h}%`, zIndex: el.zIndex, transform: `rotate(${el.rotation}deg)` }}
-                      onPointerDown={e => onCardPointerDown(e, el.id)}
-                      onPointerMove={onCardPointerMove}
-                      onPointerUp={onCardPointerUp}
-                      onPointerLeave={onCardPointerUp}
-                    >
-                      {el.type === "text" && (
-                        <div className="w-full h-full flex items-center justify-center text-center text-sm font-bold leading-tight p-1 overflow-hidden"
-                          style={{ fontFamily: el.fontFamily, color: el.color, WebkitTextStroke: (el.strokeWidth || 0) > 0 ? `${el.strokeWidth}px ${el.strokeColor || "#000"}` : undefined }}
-                        >{el.content}</div>
-                      )}
-                      {el.type === "image" && el.imageData && (
-                        <img src={el.imageData} alt="" className="w-full h-full object-cover rounded-xl" />
-                      )}
-                      {el.type === "sticker" && (
-                        <div className="w-full h-full flex items-center justify-center text-3xl">{el.content}</div>
-                      )}
-
-                      {/* Resize handles on selected */}
-                      {selId === el.id && (
-                        <div className="absolute inset-0 pointer-events-none">
-                          {["nw", "n", "ne", "e", "se", "s", "sw", "w"].map(d => (
-                            <div key={d}
-                              className="absolute w-2.5 h-2.5 rounded-full bg-white border-2 border-[#7B61FF] shadow pointer-events-auto"
-                              style={{
-                                ...(d.includes("n") ? { top: -4 } : d.includes("s") ? { bottom: -4 } : { top: "calc(50% - 5px)" }),
-                                ...(d.includes("w") ? { left: -4 } : d.includes("e") ? { right: -4 } : { left: "calc(50% - 5px)" }),
-                                cursor: `${d}-resize`,
-                              }}
-                              onPointerDown={e => onResizeStart(e, el.id, d)}
-                              onPointerMove={onResizeMove}
-                              onPointerUp={onResizeEnd}
-                              onPointerLeave={onResizeEnd}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-
-                  {/* Empty state */}
-                  {elements.length === 0 && (
-                    <div className="absolute inset-0 flex items-center justify-center text-white/30 text-[11px]">
-                      Add text, image or sticker
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Element layer controls */}
-              {elements.length > 0 && (
-                <div className="flex items-center gap-2 text-xs text-[rgba(17,17,17,0.5)] -my-1">
-                  <Layers size={12} />
-                  <span>{elements.length} element{elements.length > 1 ? "s" : ""}</span>
-                  {selEl && (
+                  {showFooter && (
                     <>
-                      <button onClick={() => updateElement(selEl.id, { rotation: (selEl.rotation || 0) - 15 })} className="ml-auto flex items-center gap-1 px-2 py-1 rounded-lg bg-black/5 hover:bg-black/10"><RotateCw size={12} /> Rotate</button>
-                      <button onClick={() => bringToFront(selEl.id)} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-black/5 hover:bg-black/10"><Layers size={12} /> Front</button>
-                      <button onClick={() => removeElement(selEl.id)} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-red-50 text-red-400 hover:bg-red-100"><Trash2 size={12} /> Remove</button>
+                      {/* Your Name */}
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between py-3">
+                          <p className="font-normal text-[17px] text-black">Your Name</p>
+                        </div>
+                        <div className="bg-white rounded-[12px] overflow-hidden">
+                          <input
+                            value={userName}
+                            onChange={e => setUserName(e.target.value)}
+                            placeholder="Bruno"
+                            maxLength={30}
+                            className="w-full px-5 py-5 text-[17px] outline-none bg-transparent text-black placeholder:text-[rgba(60,60,67,0.3)] tracking-[-0.4px]"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Your Role */}
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between py-3">
+                          <p className="font-normal text-[17px] text-black">Your Role</p>
+                        </div>
+                        <div className="bg-white rounded-[12px] overflow-hidden">
+                          <input
+                            value={userRole}
+                            onChange={e => setUserRole(e.target.value)}
+                            placeholder="Product Designer"
+                            maxLength={40}
+                            className="w-full px-5 py-5 text-[17px] outline-none bg-transparent text-black placeholder:text-[rgba(60,60,67,0.3)] tracking-[-0.4px]"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Footer Font Color */}
+                      <div className="flex flex-col gap-4">
+                        <SectionRow
+                          icon={<Palette size={20} />}
+                          label="Font Color"
+                          right={
+                            <div className="size-[28px] rounded-[14px] shrink-0"
+                              style={{ background: footerColor, border: footerColor === "#ffffff" ? "2px solid #c6c6c8" : "none" }} />
+                          }
+                        />
+                        <ColorSwatches selected={footerColor} onSelect={setFooterColor} />
+                      </div>
                     </>
                   )}
                 </div>
-              )}
 
-              {/* Tab bar */}
-              <div className="flex gap-1 bg-[rgba(17,17,17,0.04)] rounded-2xl p-1 overflow-x-auto">
-                {([{ key: "text", label: "Text", icon: <Type size={13} /> },
-                   { key: "image", label: "Image", icon: <Image size={13} /> },
-                   { key: "camera_gif", label: "Camera", icon: <Camera size={13} /> },
-                   { key: "sticker", label: "Sticker", icon: <Sticker size={13} /> }] as const).map(t => (
-                  <button key={t.key} onClick={() => setTab(t.key)}
-                    className="flex-1 h-10 rounded-xl flex items-center justify-center gap-1.5 text-xs font-medium transition-all"
-                    style={{ background: tab === t.key ? "#fff" : "transparent", color: tab === t.key ? "#7B61FF" : "rgba(17,17,17,0.5)", boxShadow: tab === t.key ? "0 1px 4px rgba(0,0,0,0.08)" : "none" }}
-                  >{t.icon}{t.label}</button>
-                ))}
+                {/* ── ADD TO CARD BUTTON ────────────────────────────────── */}
+                <button
+                  onClick={handleSubmit}
+                  className="w-full rounded-[12px] h-[64px] flex items-center justify-center transition-opacity"
+                  style={{
+                    background: "#323232",
+                    opacity: (tab === "text" && !textContent.trim()) || (tab === "image" && !imageBase64) ? 0.5 : 1,
+                  }}
+                >
+                  <span className="font-semibold text-[19px] text-white" style={{ fontFamily: "Inter, sans-serif" }}>
+                    Add To Card
+                  </span>
+                </button>
               </div>
+            )}
+          </div>
+        </div>
 
-              {/* Tab content + Add to card button */}
-              {tab === "text" && (
-                <div className="space-y-3">
-                  <textarea value={textContent} onChange={e => setTextContent(e.target.value)}
-                    placeholder="Type something…" maxLength={140} rows={2}
-                    className="w-full rounded-2xl px-4 py-3 text-sm resize-none outline-none bg-[rgba(17,17,17,0.05)] text-[#111]"
-                  />
-                  <div className="flex flex-wrap gap-3">
-                    <div>
-                      <p className="text-[10px] font-semibold text-[rgba(17,17,17,0.35)] uppercase mb-1">Font</p>
-                      <div className="flex gap-1">
-                        {FONTS.map((f, i) => (
-                          <button key={f.id} onClick={() => setFontIdx(i)}
-                            className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-all"
-                            style={{ background: fontIdx === i ? "rgba(123,97,255,0.12)" : "rgba(17,17,17,0.05)", color: fontIdx === i ? "#7B61FF" : "rgba(17,17,17,0.5)", fontFamily: f.family }}
-                          >{f.label}</button>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-semibold text-[rgba(17,17,17,0.35)] uppercase mb-1">Color</p>
-                      <div className="flex gap-1">
-                        {TEXT_COLORS.map((c, i) => (
-                          <button key={i} onClick={() => setTextColorIdx(i)}
-                            className="w-6 h-6 rounded-full transition-transform hover:scale-110"
-                            style={{ background: c, outline: textColorIdx === i ? "2px solid #7B61FF" : "2px solid transparent", outlineOffset: 2, boxShadow: c === "#fff" ? "0 0 0 1px rgba(0,0,0,0.1)" : "none" }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-semibold text-[rgba(17,17,17,0.35)] uppercase mb-1">Stroke</p>
-                      <div className="flex gap-1">
-                        {STROKE_SIZES.map((s, i) => (
-                          <button key={i} onClick={() => setStrokeWeightIdx(i)}
-                            className="w-6 h-6 rounded-lg text-[10px] font-medium transition-all"
-                            style={{ background: strokeWeightIdx === i ? "rgba(123,97,255,0.12)" : "rgba(17,17,17,0.05)", color: strokeWeightIdx === i ? "#7B61FF" : "rgba(17,17,17,0.5)" }}
-                          >{s === 0 ? "–" : s}</button>
-                        ))}
-                      </div>
-                    </div>
+        {/* ── RIGHT PANEL: Card Preview (desktop only) ──────────────────────── */}
+        <div className="hidden md:flex flex-1 bg-white flex-col relative overflow-hidden" style={{ minWidth: 480 }}>
+          {/* Top controls */}
+          <div className="flex items-center justify-between px-6 pt-5 pb-3">
+            {/* Front/Back segmented */}
+            <div className="bg-[rgba(120,120,128,0.12)] h-[40px] rounded-[10px] overflow-hidden flex p-[3px] gap-0">
+              {(["front", "back"] as const).map(side => (
+                <button key={side}
+                  onClick={() => setCardSide(side)}
+                  className="px-5 h-full rounded-[8px] text-[16px] leading-none transition-all relative"
+                  style={{ fontWeight: cardSide === side ? 600 : 400 }}>
+                  {cardSide === side && <span className="absolute inset-0 bg-white rounded-[8px] shadow-[0px_3px_10px_rgba(0,0,0,0.1)]" />}
+                  <span className="relative capitalize">{side}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Close button - liquid glass */}
+            <button
+              onClick={onClose}
+              className="flex items-center justify-center rounded-full transition-opacity hover:opacity-75"
+              style={{
+                width: 52, height: 52,
+                background: "rgba(255,255,255,0.75)",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.06)",
+                backdropFilter: "blur(12px)",
+              }}
+            >
+              <X size={20} color="#111" />
+            </button>
+          </div>
+
+          {/* Card preview centered */}
+          <div className="flex-1 flex items-center justify-center pb-4">
+            <CardPreview />
+          </div>
+
+          {/* Theme selector */}
+          <div className="px-6 pb-5 flex flex-col gap-3">
+            <p className="text-[18px] font-semibold text-center text-[#979797]" style={{ fontFamily: "Inter, sans-serif" }}>
+              Swipe to Change Theme
+            </p>
+            <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+              {THEMES.map((t, i) => (
+                <button
+                  key={t.id}
+                  onClick={() => setThemeIdx(i)}
+                  className="relative shrink-0 rounded-[18px] overflow-hidden transition-all"
+                  style={{
+                    width: 88, height: 88,
+                    backgroundImage: t.img ? `url(${t.img})` : undefined,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                    background: t.img ? undefined : customColor,
+                    outline: themeIdx === i ? "2.5px solid #7B61FF" : "2px solid transparent",
+                    outlineOffset: 2,
+                  }}
+                >
+                  <div className="absolute inset-0 flex items-end justify-start p-2">
+                    <span className="text-[10px] font-semibold text-white"
+                      style={{ textShadow: "0 1px 3px rgba(0,0,0,0.6)" }}>
+                      {t.label}
+                    </span>
                   </div>
-                  <button onClick={handleTabAction}
-                    className="w-full h-11 rounded-2xl text-sm font-semibold flex items-center justify-center gap-2"
-                    style={{ background: textContent.trim() ? "#7B61FF" : "rgba(123,97,255,0.2)", color: textContent.trim() ? "#fff" : "rgba(123,97,255,0.4)", cursor: textContent.trim() ? "pointer" : "not-allowed" }}
-                    disabled={!textContent.trim()}
-                  ><Type size={15} /> {selEl?.type === "text" ? "Update text" : "Add text"}</button>
-                </div>
-              )}
+                </button>
+              ))}
+            </div>
 
-              {tab === "image" && (
-                <div className="space-y-3">
-                  <input ref={fileRef} type="file" accept="image/*" onChange={async e => {
-                    const f = e.target.files?.[0]; if (!f) return;
-                    setImagePreview(URL.createObjectURL(f));
-                    const reader = new FileReader();
-                    reader.onload = () => setImageBase64(reader.result as string);
-                    reader.readAsDataURL(f);
-                  }} className="hidden" />
-                  <div className="flex gap-2">
-                    <button onClick={() => fileRef.current?.click()} className="flex-1 h-16 rounded-2xl border-2 border-dashed border-[rgba(17,17,17,0.12)] flex items-center justify-center gap-2 text-sm text-[rgba(17,17,17,0.4)] hover:border-[#7B61FF] hover:text-[#7B61FF] transition-colors">
-                      <Image size={18} /> Gallery
-                    </button>
-                    <button onClick={startCamera} className="flex-1 h-16 rounded-2xl border-2 border-dashed border-[rgba(17,17,17,0.12)] flex items-center justify-center gap-2 text-sm text-[rgba(17,17,17,0.4)] hover:border-[#7B61FF] hover:text-[#7B61FF] transition-colors">
-                      <Camera size={18} /> Capture
-                    </button>
-                  </div>
-                  {imagePreview && <img src={imagePreview} alt="" className="w-full h-24 rounded-2xl object-cover" />}
-                  {showCamera && (
-                    <div className="relative rounded-2xl overflow-hidden bg-black">
-                      <video ref={videoRef} autoPlay playsInline className="w-full h-36 object-cover" />
-                      <button onClick={() => { const d = capturePhoto(); if (d) { setImagePreview(d); stopCamera(); } }} className="absolute bottom-2 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-white/80 flex items-center justify-center"><div className="w-8 h-8 rounded-full bg-white border-2 border-[#111]" /></button>
-                    </div>
-                  )}
-                  <button onClick={handleTabAction} disabled={!imagePreview}
-                    className="w-full h-11 rounded-2xl text-sm font-semibold flex items-center justify-center gap-2"
-                    style={{ background: imagePreview ? "#7B61FF" : "rgba(123,97,255,0.2)", color: imagePreview ? "#fff" : "rgba(123,97,255,0.4)", cursor: imagePreview ? "pointer" : "not-allowed" }}
-                  ><Image size={15} /> {selEl?.type === "image" ? "Update image" : "Add image"}</button>
-                </div>
-              )}
-
-              {tab === "camera_gif" && (
-                <div className="space-y-3">
-                  {!showCamera && camState === "idle" && (
-                    <button onClick={startCamera} className="w-full h-24 rounded-2xl border-2 border-dashed border-[rgba(17,17,17,0.12)] flex items-center justify-center gap-2 text-sm text-[rgba(17,17,17,0.4)] hover:border-[#7B61FF] hover:text-[#7B61FF] transition-colors">
-                      <Camera size={18} /> Start camera
-                    </button>
-                  )}
-                  {camState === "denied" && (
-                    <div className="text-center py-6 text-sm text-[rgba(17,17,17,0.4)]">
-                      Camera unavailable. Try uploading a photo instead.
-                    </div>
-                  )}
-                  {showCamera && camState === "ready" && (
-                    <div className="relative rounded-2xl overflow-hidden bg-black">
-                      <video ref={videoRef} autoPlay playsInline muted className="w-full h-48 object-cover" style={{ transform: "scaleX(-1)" }} />
-                      <button onClick={startCamShoot} className="absolute bottom-3 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full bg-white/80 flex items-center justify-center border-2 border-white hover:bg-white transition-colors">
-                        <div className="w-9 h-9 rounded-full bg-white border-2 border-[#111]" />
-                      </button>
-                    </div>
-                  )}
-                  {camState === "shooting" && (
-                    <div className="text-center py-8">
-                      <div className="text-5xl font-bold text-[#7B61FF] mb-2">{camCountdown}</div>
-                      <p className="text-sm text-[rgba(17,17,17,0.4)]">Capturing shots...</p>
-                      <div className="flex justify-center gap-1 mt-4">
-                        {[0, 1, 2].map(i => (
-                          <div key={i} className="w-4 h-4 rounded-full" style={{ background: camShots[i] ? "#7B61FF" : "rgba(17,17,17,0.1)" }} />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {camState === "review" && camShots.length === 3 && (
-                    <div>
-                      <div className="flex gap-2 overflow-x-auto pb-1">
-                        {camShots.map((s, i) => (
-                          <img key={i} src={s} alt={`shot ${i}`} className="w-24 h-18 rounded-xl object-cover flex-shrink-0" />
-                        ))}
-                      </div>
-                      <button onClick={startCamShoot} className="w-full h-10 rounded-2xl text-sm font-medium mt-2" style={{ background: "rgba(17,17,17,0.06)", color: "#111" }}>
-                        Retake
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {tab === "sticker" && (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-4 gap-2">
-                    {STICKER_LIST.map((s, i) => (
-                      <button key={s.id} onClick={() => setStickerIdx(i)}
-                        className="h-14 rounded-2xl flex items-center justify-center text-2xl transition-all"
-                        style={{ background: stickerIdx === i ? "rgba(123,97,255,0.12)" : "rgba(17,17,17,0.04)", outline: stickerIdx === i ? "2px solid #7B61FF" : "2px solid transparent" }}
-                      >{s.label}</button>
-                    ))}
-                  </div>
-                  <button onClick={handleTabAction}
-                    className="w-full h-11 rounded-2xl text-sm font-semibold flex items-center justify-center gap-2 bg-[#7B61FF] text-white"
-                  ><Sticker size={15} /> {selEl?.type === "sticker" ? "Update sticker" : "Add sticker"}</button>
-                </div>
-              )}
-
-              {/* Stroke/border style */}
-              <div>
-                <p className="text-[10px] font-semibold text-[rgba(17,17,17,0.35)] uppercase mb-1.5">Border Style</p>
-                <div className="flex gap-1.5">
-                  {STROKE_STYLES.map((s, i) => (
-                    <button key={s.id} onClick={() => setStrokeIdx(i)}
-                      className="flex-1 h-9 rounded-xl text-[10px] font-medium transition-all"
-                      style={{
-                        background: strokeIdx === i ? "#7B61FF" : "rgba(17,17,17,0.05)",
-                        color: strokeIdx === i ? "#fff" : "rgba(17,17,17,0.5)",
-                        outline: s.css ? s.css : "none",
-                      }}
-                    >{s.label}</button>
+            {/* Custom color (only when custom theme selected) */}
+            {isCustom && (
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[12px] text-[rgba(60,60,67,0.6)]">Color:</span>
+                <div className="flex gap-2 flex-wrap">
+                  {["#7B61FF","#F24822","#1ABCFE","#111111","#FFCD29","#0FA958","#ff006e","#3a86ff"].map(c => (
+                    <button key={c} onClick={() => setCustomColor(c)}
+                      className="size-6 rounded-full transition-transform hover:scale-110"
+                      style={{ background: c, ...swatchRing(customColor === c) }} />
                   ))}
+                  <label className="size-6 rounded-full cursor-pointer overflow-hidden flex items-center justify-center"
+                    style={{ background: "conic-gradient(from 90deg, #ff0000, #ff9500, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)" }}>
+                    <input type="color" value={customColor} onChange={e => setCustomColor(e.target.value)} className="opacity-0 absolute w-0 h-0" />
+                  </label>
                 </div>
               </div>
-
-              {/* User info */}
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <p className="text-[10px] font-semibold text-[rgba(17,17,17,0.35)] uppercase mb-1">Name</p>
-                  <input value={userName} onChange={e => setUserName(e.target.value)} placeholder="Your name" maxLength={20}
-                    className="w-full h-10 rounded-xl px-3 text-sm outline-none bg-[rgba(17,17,17,0.05)] text-[#111] placeholder:text-[rgba(17,17,17,0.25)]"
-                  />
-                </div>
-                <div className="flex-1">
-                  <p className="text-[10px] font-semibold text-[rgba(17,17,17,0.35)] uppercase mb-1">Role</p>
-                  <input value={userRole} onChange={e => setUserRole(e.target.value)} placeholder="e.g. Product Designer" maxLength={30}
-                    className="w-full h-10 rounded-xl px-3 text-sm outline-none bg-[rgba(17,17,17,0.05)] text-[#111] placeholder:text-[rgba(17,17,17,0.25)]"
-                  />
-                </div>
-              </div>
-
-              {/* Submit */}
-              <button onClick={handleSubmit} disabled={elements.length === 0}
-                className="w-full h-12 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 transition-all"
-                style={{ background: elements.length > 0 ? "#111" : "rgba(17,17,17,0.1)", color: elements.length > 0 ? "#fff" : "rgba(17,17,17,0.3)", cursor: elements.length > 0 ? "pointer" : "not-allowed" }}
-              >Drop it <ArrowRight size={15} /></button>
-            </>
-          )}
+            )}
+          </div>
         </div>
       </motion.div>
     </motion.div>
-  );
-}
-
-// Success view
-function SuccessView({ card, onClose }: { card: UserCard; onClose: () => void }) {
-  return (
-    <div className="text-center relative overflow-hidden py-6">
-      {Array.from({ length: 22 }).map((_, i) => (
-        <motion.div key={i} className="absolute pointer-events-none"
-          style={{ width: i % 3 === 0 ? 8 : 5, height: i % 3 === 0 ? 8 : 5, borderRadius: i % 2 === 0 ? "50%" : 2, background: ["#7B61FF", "#F24822", "#1ABCFE", "#FFCD29", "#fff", "#7B61FF", "#F24822"][i % 7], left: `${6 + (i * 4.2) % 88}%`, top: -10 }}
-          animate={{ y: [0, 280 + (i % 5) * 30], x: [(i % 2 === 0 ? 1 : -1) * ((i * 7) % 40)], rotate: [0, (i % 2 === 0 ? 1 : -1) * (180 + (i * 30) % 180)], opacity: [1, 1, 0] }}
-          transition={{ duration: 1.2 + (i % 4) * 0.25, delay: (i % 6) * 0.08, ease: "easeIn" }}
-        />
-      ))}
-      <div className="flex justify-center pt-4 mb-5">
-        <motion.div className="relative flex flex-col justify-between overflow-hidden p-4"
-          style={{ width: 160, height: 229, borderRadius: 14, background: "#7B61FF", boxShadow: "0 16px 56px rgba(0,0,0,0.15)", fontFamily: "Inter,sans-serif" }}
-          initial={{ scale: 0.65, rotate: -8, opacity: 0, y: 20 }}
-          animate={{ scale: 1, rotate: 4, opacity: 1, y: 0 }}
-          transition={{ type: "spring", stiffness: 280, damping: 18, delay: 0.1 }}
-        >
-          <div className="flex-1 flex items-center justify-center text-center text-sm font-bold text-white leading-tight px-1 pt-4">{card.quote}</div>
-          <div className="flex justify-between items-end text-[9px] text-white/60 mt-2">
-            <span>{card.userName || ""}</span>
-            <span>{card.userRole || ""}</span>
-          </div>
-        </motion.div>
-      </div>
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35, duration: 0.4 }}>
-        <p className="text-lg font-bold text-[#111]">You left your mark ✦</p>
-        <p className="text-sm text-[rgba(17,17,17,0.4)] mt-1">Your card is now on the wall</p>
-      </motion.div>
-      <motion.button initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.4 }}
-        onClick={onClose} className="w-full h-12 rounded-2xl text-sm font-medium mt-5"
-        style={{ background: "rgba(17,17,17,0.06)", color: "#111", border: "1px solid rgba(17,17,17,0.1)" }}
-      >Explore the wall</motion.button>
-    </div>
   );
 }

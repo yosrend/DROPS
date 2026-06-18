@@ -1,18 +1,82 @@
-import { useState, useEffect } from "react";
-import { getDeviceId } from "../../utils/device";
-import { CARDS_KEY, type UserCard } from "../data/defaults";
+import { useState, useEffect, useCallback } from "react";
+import { getDrops, updateDrop, deleteDrop as deleteDropApi } from "../../services/dropsService";
+import { Eye, EyeOff, Trash2, Pin, Star, Search, RefreshCw, LogOut, X, Smartphone, Globe, Monitor, Clock, Type, Image, Sticker } from "lucide-react";
 
 const ADMIN_KEY = "drops_admin_session";
+
+interface EnrichedCard {
+  id: string;
+  quote: string;
+  handle: string;
+  bg: string;
+  type: string;
+  imageData?: string;
+  userName?: string;
+  userRole?: string;
+  deviceId?: string;
+  createdAt?: string;
+  isHidden?: boolean;
+  isPinned?: boolean;
+  isFeatured?: boolean;
+  stickerLabel?: string;
+  fontStyle?: string;
+  themeId?: string;
+}
 
 export default function AdminPanel({ onClose }: { onClose: () => void }) {
   const [loggedIn, setLoggedIn] = useState(() => sessionStorage.getItem(ADMIN_KEY) === "true");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [cards, setCards] = useState<UserCard[]>([]);
+  const [cards, setCards] = useState<EnrichedCard[]>([]);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "type">("newest");
+  const [myIp, setMyIp] = useState("");
+  const [myDevice, setMyDevice] = useState("");
 
   const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD;
+
+  // Detect own IP & device info
+  useEffect(() => {
+    fetch("https://api.ipify.org?format=json")
+      .then(r => r.json())
+      .then(d => setMyIp(d.ip))
+      .catch(() => setMyIp("unknown"));
+    setMyDevice(navigator.userAgent);
+  }, []);
+
+  const loadCards = useCallback(async () => {
+    setLoading(true);
+    try {
+      const all = await getDrops();
+      const enriched = all.map((c: any) => ({
+        id: c.id,
+        quote: c.quote || c.text_content || "",
+        handle: c.handle || "@you",
+        bg: c.bg || c.accentColor || "#7B61FF",
+        type: c.type || "text",
+        imageData: c.imageData || c.content_url,
+        userName: c.userName || c.user_name || "",
+        userRole: c.userRole || c.user_role || "",
+        deviceId: c.deviceId || c.device_id || "",
+        createdAt: c.createdAt || c.created_at || "",
+        isHidden: c.isHidden ?? c.is_hidden ?? false,
+        isPinned: c.isPinned ?? c.is_pinned ?? false,
+        isFeatured: c.isFeatured ?? c.is_featured ?? false,
+        stickerLabel: c.stickerLabel || c.sticker_label || "",
+        fontStyle: c.fontStyle || c.font_style || "",
+        themeId: c.themeId || c.theme_id || "",
+      }));
+      setCards(enriched);
+    } catch {}
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (!loggedIn) return;
+    loadCards();
+  }, [loggedIn, loadCards]);
 
   const handleLogin = () => {
     if (password === adminPassword) {
@@ -29,33 +93,83 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
     setLoggedIn(false);
   };
 
-  useEffect(() => {
-    if (!loggedIn) return;
-    const stored = localStorage.getItem(CARDS_KEY);
-    try { setCards(stored ? JSON.parse(stored) : []); } catch { setCards([]); }
-  }, [loggedIn]);
-
-  const deleteCard = (id: string) => {
-    // update localStorage
-    const updated = cards.filter(c => c.id !== id);
-    localStorage.setItem(CARDS_KEY, JSON.stringify(updated));
-    setCards(updated);
+  const deleteCard = async (id: string) => {
+    await deleteDropApi(id);
+    setCards(prev => prev.filter(c => c.id !== id));
   };
 
-  const toggleHidden = (id: string) => {
-    const updated = cards.map(c => c.id === id ? { ...c, isHidden: !(c as any).isHidden } : c);
-    localStorage.setItem(CARDS_KEY, JSON.stringify(updated));
-    setCards(updated);
+  const toggleHidden = async (id: string) => {
+    const card = cards.find(c => c.id === id);
+    if (!card) return;
+    const hidden = !card.isHidden;
+    await updateDrop(id, { is_hidden: hidden } as any);
+    setCards(prev => prev.map(c => c.id === id ? { ...c, isHidden: hidden } : c));
   };
 
-  const filteredCards = cards.filter(c => {
-    if (filter === "hidden" && !(c as any).isHidden) return false;
-    if (filter === "visible" && (c as any).isHidden) return false;
-    if (filter === "pinned" && !(c as any).isPinned) return false;
-    if (filter === "featured" && !(c as any).isFeatured) return false;
-    if (search && !c.quote?.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
+  const togglePinned = async (id: string) => {
+    const card = cards.find(c => c.id === id);
+    if (!card) return;
+    const pinned = !card.isPinned;
+    await updateDrop(id, { is_pinned: pinned } as any);
+    setCards(prev => prev.map(c => c.id === id ? { ...c, isPinned: pinned } : c));
+  };
+
+  // Stats
+  const visible = cards.filter(c => !c.isHidden);
+  const hidden = cards.filter(c => c.isHidden);
+  const pinned = cards.filter(c => c.isPinned);
+  const uniqueUsers = new Set(cards.map(c => c.deviceId || c.userName).filter(Boolean)).size;
+
+  // Sort & filter
+  const processed = cards
+    .filter(c => {
+      if (filter === "visible" && c.isHidden) return false;
+      if (filter === "hidden" && !c.isHidden) return false;
+      if (filter === "pinned" && !c.isPinned) return false;
+      if (filter === "featured" && !c.isFeatured) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        return c.quote.toLowerCase().includes(q)
+          || c.userName?.toLowerCase().includes(q)
+          || c.userRole?.toLowerCase().includes(q)
+          || c.id.toLowerCase().includes(q);
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "type") return a.type.localeCompare(b.type);
+      // newest/oldest
+      const ta = a.createdAt || "";
+      const tb = b.createdAt || "";
+      if (!ta && !tb) return 0;
+      if (!ta) return 1;
+      if (!tb) return -1;
+      return sortBy === "newest"
+        ? tb.localeCompare(ta)
+        : ta.localeCompare(tb);
+    });
+
+  const typeIcon = (t: string) => {
+    if (t === "image" || t === "gif") return <Image size={12} />;
+    if (t === "sticker") return <Sticker size={12} />;
+    return <Type size={12} />;
+  };
+
+  const formatDate = (d?: string) => {
+    if (!d) return "—";
+    try {
+      return new Date(d).toLocaleString("en-US", {
+        month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
+      });
+    } catch { return d; }
+  };
+
+  const textColor = (bg: string) => {
+    const light = bg === "#FFCD29" || bg === "#F5F0E8" || bg === "#fc0" || bg === "#4cd964" || bg === "#5ac8fa" || bg === "#fff";
+    return light ? "#111" : "#fff";
+  };
+
+  // ── Auth gates ──
 
   if (!adminPassword) {
     return (
@@ -89,60 +203,172 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-white overflow-y-auto" style={{ fontFamily: "Inter,sans-serif" }}>
-      <div className="max-w-[600px] mx-auto p-5">
-        <div className="flex items-center justify-between mb-5">
+    <div className="fixed inset-0 z-[9999] bg-[#f5f5f7] overflow-y-auto" style={{ fontFamily: "Inter,sans-serif" }}>
+      <div className="max-w-[720px] mx-auto p-5">
+
+        {/* ── Header ── */}
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <p className="text-lg font-bold text-[#111]">Admin</p>
-            <p className="text-xs text-[rgba(17,17,17,0.4)]">{cards.length} drops · {cards.filter(c => (c as any).isHidden).length} hidden</p>
+            <h1 className="text-xl font-bold text-[#111]">Dashboard</h1>
+            <p className="text-xs text-[rgba(17,17,17,0.4)] mt-0.5">{cards.length} total drops · {hidden.length} hidden</p>
           </div>
-          <div className="flex gap-2">
-            <button onClick={handleLogout} className="px-4 h-9 rounded-xl text-xs font-medium bg-[rgba(17,17,17,0.06)] text-[rgba(17,17,17,0.5)]">Logout</button>
-            <button onClick={onClose} className="px-4 h-9 rounded-xl text-xs font-medium bg-[#111] text-white">Back</button>
+          <div className="flex items-center gap-2">
+            <button onClick={loadCards} className="w-9 h-9 rounded-xl flex items-center justify-center bg-white border border-[rgba(17,17,17,0.08)] hover:bg-[#f0f0f0] transition-colors">
+              <RefreshCw size={14} className={loading ? "animate-spin" : ""} style={{ color: loading ? "#7B61FF" : "rgba(17,17,17,0.4)" }} />
+            </button>
+            <button onClick={handleLogout} className="px-3 h-9 rounded-xl text-xs font-medium bg-white border border-[rgba(17,17,17,0.08)] hover:bg-[#f0f0f0] transition-colors flex items-center gap-1.5" style={{ color: "rgba(17,17,17,0.5)" }}>
+              <LogOut size={12} /> Logout
+            </button>
+            <button onClick={onClose} className="px-4 h-9 rounded-xl text-xs font-medium bg-[#111] text-white hover:bg-[#2a2a2a] transition-colors">Back</button>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-          {["all", "visible", "hidden", "pinned", "featured"].map(f => (
-            <button key={f} onClick={() => setFilter(f)}
-              className="px-3 h-8 rounded-lg text-xs font-medium flex-shrink-0"
-              style={{ background: filter === f ? "#7B61FF" : "rgba(17,17,17,0.05)", color: filter === f ? "#fff" : "rgba(17,17,17,0.5)" }}
-            >{f}</button>
+        {/* ── Stats Grid ── */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          {[
+            { label: "Total Drops", value: cards.length, color: "#7B61FF" },
+            { label: "Visible", value: visible.length, color: "#4cd964" },
+            { label: "Hidden", value: hidden.length, color: "#ff3b30" },
+            { label: "Unique Users", value: uniqueUsers, color: "#007aff" },
+          ].map(s => (
+            <div key={s.label} className="bg-white rounded-2xl p-4 border border-[rgba(17,17,17,0.06)]">
+              <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "rgba(17,17,17,0.35)" }}>{s.label}</p>
+              <p className="text-2xl font-bold mt-1" style={{ color: s.color }}>{s.value}</p>
+            </div>
           ))}
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…"
-            className="h-8 rounded-lg px-3 text-xs outline-none bg-[rgba(17,17,17,0.05)] text-[#111] placeholder:text-[rgba(17,17,17,0.25)] flex-shrink-0 w-[120px]"
-          />
         </div>
 
-        {/* Card list */}
-        {filteredCards.length === 0 && (
-          <div className="text-center py-10 text-sm text-[rgba(17,17,17,0.4)]">No drops found</div>
+        {/* ── Detected Info ── */}
+        <div className="bg-white rounded-2xl p-4 border border-[rgba(17,17,17,0.06)] mb-6">
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs" style={{ color: "rgba(17,17,17,0.5)" }}>
+            <span className="flex items-center gap-1.5"><Globe size={12} /> Your IP: <strong style={{ color: "#111" }}>{myIp}</strong></span>
+            <span className="flex items-center gap-1.5"><Monitor size={12} /> Device: <strong style={{ color: "#111" }} className="truncate max-w-[200px]">{myDevice.slice(0, 60)}</strong></span>
+          </div>
+        </div>
+
+        {/* ── Filters ── */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {["all", "visible", "hidden", "pinned"].map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              className="px-3 h-8 rounded-lg text-xs font-medium transition-colors"
+              style={{
+                background: filter === f ? "#111" : "rgba(17,17,17,0.06)",
+                color: filter === f ? "#fff" : "rgba(17,17,17,0.5)",
+              }}
+            >{f.charAt(0).toUpperCase() + f.slice(1)}</button>
+          ))}
+          <select value={sortBy} onChange={e => setSortBy(e.target.value as any)}
+            className="h-8 rounded-lg px-2 text-xs font-medium outline-none bg-[rgba(17,17,17,0.06)]"
+            style={{ color: "rgba(17,17,17,0.5)" }}>
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+            <option value="type">By type</option>
+          </select>
+          <div className="relative flex-1 min-w-[140px]">
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: "rgba(17,17,17,0.25)" }} />
+            <input value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Search cards, users…"
+              className="w-full h-8 rounded-lg pl-7 pr-3 text-xs outline-none bg-[rgba(17,17,17,0.06)] text-[#111] placeholder:text-[rgba(17,17,17,0.25)]"
+            />
+          </div>
+        </div>
+
+        {/* ── Loading ── */}
+        {loading && (
+          <div className="text-center py-8 text-sm" style={{ color: "rgba(17,17,17,0.4)" }}>
+            <RefreshCw size={16} className="inline animate-spin mr-2" />Loading drops…
+          </div>
         )}
-        <div className="space-y-2">
-          {filteredCards.map(c => (
-            <div key={c.id} className="rounded-2xl p-3 border border-[rgba(17,17,17,0.06)]" style={{ background: c.bg || "#f5f5f5" }}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate text-white" style={{ color: c.bg === "#FFCD29" || c.bg === "#F5F0E8" ? "#111" : "#fff" }}>
-                    {c.quote || "(no text)"}
-                  </p>
-                  <p className="text-[10px] mt-0.5" style={{ color: c.bg === "#FFCD29" || c.bg === "#F5F0E8" ? "rgba(17,17,17,0.4)" : "rgba(255,255,255,0.5)" }}>
-                    {c.type} · {c.id?.slice(0, 8)}… · {c.userName || "?"} · {c.userRole || "?"}
-                  </p>
-                  {c.imageData && <p className="text-[9px] text-white/40 mt-0.5 truncate">📎 has image</p>}
-                </div>
-                <div className="flex gap-1 flex-shrink-0">
-                  <button onClick={() => toggleHidden(c.id)} className="px-2 h-7 rounded-lg text-[10px] font-medium"
-                    style={{ background: (c as any).isHidden ? "rgba(248,66,34,0.1)" : "rgba(17,17,17,0.06)", color: (c as any).isHidden ? "#F24822" : "rgba(17,17,17,0.5)" }}>
-                    {(c as any).isHidden ? "Hidden" : "Visible"}
-                  </button>
-                  <button onClick={() => { if (confirm("Delete this drop?")) deleteCard(c.id); }} className="px-2 h-7 rounded-lg text-[10px] font-medium bg-red-50 text-red-400">Delete</button>
+
+        {/* ── Empty ── */}
+        {!loading && processed.length === 0 && (
+          <div className="text-center py-12">
+            <div className="text-3xl mb-3 opacity-30">✦</div>
+            <p className="text-sm font-medium" style={{ color: "rgba(17,17,17,0.4)" }}>No drops found</p>
+          </div>
+        )}
+
+        {/* ── Card List ── */}
+        {!loading && <div className="space-y-2">
+          {processed.map(c => (
+            <div key={c.id}
+              className="bg-white rounded-2xl border border-[rgba(17,17,17,0.06)] overflow-hidden transition-shadow hover:shadow-sm">
+
+              {/* Card row */}
+              <div className="p-4">
+                <div className="flex items-start gap-3">
+                  {/* Theme preview squircle */}
+                  <div className="w-12 h-16 rounded-xl flex-shrink-0 flex items-center justify-center text-[8px] font-bold overflow-hidden relative"
+                    style={{ background: c.bg, color: textColor(c.bg) }}>
+                    {c.imageData ? (
+                      <img src={c.imageData} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                    ) : (
+                      <span className="leading-[1.1] text-center px-0.5">{c.quote.slice(0, 20)}</span>
+                    )}
+                    {/* Hidden overlay */}
+                    {c.isHidden && <div className="absolute inset-0 bg-black/40 flex items-center justify-center"><EyeOff size={14} color="#fff" /></div>}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[#111] truncate">{c.quote || "(empty)"}</p>
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-[10px]" style={{ color: "rgba(17,17,17,0.4)" }}>
+                          <span className="flex items-center gap-1">{typeIcon(c.type)}{c.type}</span>
+                          {c.createdAt && <span className="flex items-center gap-1"><Clock size={10} />{formatDate(c.createdAt)}</span>}
+                          {c.fontStyle && <span style={{ fontFamily: c.fontStyle }}>{c.fontStyle.split(",")[0]}</span>}
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {/* Pin */}
+                        <button onClick={() => togglePinned(c.id)}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+                          style={{ background: c.isPinned ? "rgba(255,205,41,0.15)" : "transparent" }}>
+                          <Pin size={12} style={{ color: c.isPinned ? "#fc0" : "rgba(17,17,17,0.2)" }} />
+                        </button>
+                        {/* Toggle hide/show */}
+                        <button onClick={() => toggleHidden(c.id)}
+                          className="w-14 h-7 rounded-full relative transition-colors"
+                          style={{ background: c.isHidden ? "rgba(17,17,17,0.12)" : "#34c759" }}>
+                          <div className="w-[22px] h-[22px] rounded-full bg-white shadow absolute top-[3px] transition-transform"
+                            style={{ left: c.isHidden ? "3px" : "calc(100% - 25px)" }} />
+                        </button>
+                        {/* Delete */}
+                        <button onClick={() => { if (confirm("Delete this drop?")) deleteCard(c.id); }}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-red-50 transition-colors">
+                          <Trash2 size={12} style={{ color: "rgba(248,66,34,0.5)" }} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* User info row */}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[11px] border-t border-[rgba(17,17,17,0.04)] pt-2">
+                      {c.userName && (
+                        <span className="flex items-center gap-1" style={{ color: "rgba(17,17,17,0.6)" }}>
+                          <svg width={10} height={10} viewBox="0 0 10 10"><circle cx="5" cy="3.5" r="2" fill="currentColor"/><path d="M1 9c0-2 1.8-3 4-3s4 1 4 3" stroke="currentColor" strokeWidth="0.8" fill="none"/></svg>
+                          {c.userName}{c.userRole ? ` · ${c.userRole}` : ""}
+                        </span>
+                      )}
+                      {c.deviceId && (
+                        <span className="flex items-center gap-1" style={{ color: "rgba(17,17,17,0.35)" }}>
+                          <Smartphone size={10} />
+                          {c.deviceId.slice(0, 12)}…
+                        </span>
+                      )}
+                      {!c.userName && !c.deviceId && (
+                        <span style={{ color: "rgba(17,17,17,0.25)" }}>Anonymous</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           ))}
-        </div>
+        </div>}
+
       </div>
     </div>
   );

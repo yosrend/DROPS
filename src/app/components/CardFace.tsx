@@ -23,11 +23,6 @@ export function CardFace({ quote, handle, bg, small = false }: {
       }}>
         {handle}
       </div>
-      <div style={{
-        position: "absolute", top: small ? 10 : 12, right: small ? 10 : 12,
-        width: 5, height: 5, borderRadius: "50%",
-        background: light ? "rgba(17,17,17,0.25)" : "rgba(255,255,255,0.6)",
-      }} />
     </>
   );
 }

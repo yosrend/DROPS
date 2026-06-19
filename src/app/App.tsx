@@ -5,13 +5,14 @@ import { useGyroTilt } from "../hooks/useGyroTilt";
 import Onboarding from "./components/Onboarding";
 import AddCardModal from "./components/AddCardModal";
 import AdminPanel from "./components/AdminPanel";
+
 import { CardFace } from "./components/CardFace";
 import Toast from "./components/Toast";
-import MyDrops from "./components/MyDrops";
-import FriendList from "./components/FriendList";
+import MyDropHub from "./components/MyDropHub";
 import QrScanner from "./components/QrScanner";
+
 import { ONBOARDING_KEY, CARDS_KEY, type UserCard } from "./data/defaults";
-import { getDrops, createDrop, toggleLike, getLikes, addComment, getComments, shareDropLink, shareWallLink, getDropById } from "../services/dropsService";
+import { getDrops, createDrop, shareDropLink, shareWallLink, getDropById } from "../services/dropsService";
 import { getDeviceId } from "../utils/device";
 
 // ── data ─────────────────────────────────────────────────────────────────────
@@ -106,7 +107,7 @@ const CONFETTI_COLORS = ["#7B61FF", "#F24822", "#1ABCFE", "#FFCD29", "#fff", "#7
 
 // ── Desktop Tunnel View ───────────────────────────────────────────────────────
 
-function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect: (index: number) => void }) {
+function DesktopView({ onAdd, onCardSelect, onCardTheme, onMyDrop, onScan, hasDrops }: { onAdd: () => void; onCardSelect: (index: number) => void; onCardTheme?: (themeId: string) => void; onMyDrop?: () => void; onScan?: () => void; hasDrops?: boolean }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const setModeRef = useRef<(m: "scatter" | "card") => void>(() => {});
@@ -118,13 +119,16 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
   const [showControls, setShowControls] = useState(false);
   const [spread, setSpread] = useState(0.6);
   const [depthGap, setDepthGap] = useState(200);
-  const [zoom, setZoom] = useState(1.45);
+  const [zoom, setZoom] = useState(0.82);
+  const [autoPlay, setAutoPlay] = useState(true);
   const spreadRef = useRef(spread);
   const depthGapRef = useRef(depthGap);
   const zoomRef = useRef(zoom);
   spreadRef.current = spread;
   depthGapRef.current = depthGap;
   zoomRef.current = zoom;
+  const autoPlayRef = useRef(false);
+  autoPlayRef.current = autoPlay;
   // computed center of POS
   const centerX = POS.reduce((s, [x]) => s + x, 0) / POS.length;
   const centerY = POS.reduce((s, [, y]) => s + y, 0) / POS.length;
@@ -201,6 +205,7 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
             el.addEventListener("click", () => {
               if (s.mode === "scatter") {
                 onCardSelect(logicalIdx % CARDS_DATA.length);
+                onCardTheme?.(CARD_THEMES[(l * CARDS_DATA.length + i) % CARD_THEMES.length]);
               }
             });
             canvas.appendChild(el);
@@ -308,6 +313,7 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
       if (s.panY > vh * 0.5) { s.panY -= vh; s.tPanY -= vh; }
       if (s.panY < -vh * 0.5) { s.panY += vh; s.tPanY += vh; }
       s.scrollZ += (s.targetScrollZ - s.scrollZ) * 0.04;
+      if (autoPlayRef.current) s.targetScrollZ -= 0.2;
       if (s.mode === "scatter") drawScatter();
       s.rafId = requestAnimationFrame(tick);
     };
@@ -413,9 +419,9 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
         scroll · hold & drag
       </div>
 
+      {/* Center FAB — Liquid Metal */}
       {/* Center FAB */}
-      <button
-        onClick={onAdd}
+      <button onClick={hasDrops ? () => onMyDrop?.() : onAdd}
         className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center justify-center gap-2 z-[100] transition-all hover:scale-105 active:scale-95"
         style={{
           height: 52, paddingInline: 24,
@@ -429,8 +435,92 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
           fontWeight: 500,
           boxShadow: "0 8px 32px rgba(0,0,0,0.2), 0 0 0 0.5px rgba(255,255,255,0.08)",
         }}>
-        <Plus size={16} color="#fff" />
-        Create your drops
+        {hasDrops ? <Layers size={16} color="#fff" /> : <Plus size={16} color="#fff" />}
+        {hasDrops ? "My Drop" : "Create your drops"}
+      </button>
+
+      {/* Controls button — bottom left */}
+      <button onClick={() => setShowControls(p => !p)}
+        className="absolute bottom-8 left-4 flex items-center justify-center gap-2 z-[100] transition-all hover:scale-105 active:scale-95"
+        style={{
+          width: 52, height: 52,
+          borderRadius: 26,
+          background: "rgba(255,255,255,0.12)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.2), 0 0 0 0.5px rgba(255,255,255,0.08)",
+        }}>
+        <svg width={18} height={18} viewBox="0 0 18 18" fill="none">
+          <circle cx="9" cy="9" r="7" stroke="rgba(255,255,255,0.7)" strokeWidth="1.3"/>
+          <line x1="4.5" y1="7" x2="13.5" y2="7" stroke="rgba(255,255,255,0.7)" strokeWidth="1.3"/>
+          <line x1="4.5" y1="11" x2="13.5" y2="11" stroke="rgba(255,255,255,0.7)" strokeWidth="1.3"/>
+          <line x1="7" y1="4.5" x2="7" y2="13.5" stroke="rgba(255,255,255,0.7)" strokeWidth="1.3"/>
+          <line x1="11" y1="4.5" x2="11" y2="13.5" stroke="rgba(255,255,255,0.7)" strokeWidth="1.3"/>
+        </svg>
+      </button>
+
+      {/* Controls popup */}
+      {showControls && (
+        <>
+          <div className="fixed inset-0 z-[199]" onClick={() => setShowControls(false)} />
+          <div className="fixed bottom-24 left-4 z-[200] rounded-2xl p-4 w-56"
+            style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <p className="text-[11px] font-medium text-white/50 mb-3 uppercase tracking-wider">Tunnel Controls</p>
+
+            <div className="mb-3">
+              <div className="flex justify-between text-[10px] text-white/40 mb-1">
+                <span>Spread</span><span>{spread.toFixed(2)}</span>
+              </div>
+              <input type="range" min={0.2} max={1.2} step={0.01} value={spread}
+                onChange={e => setSpread(Number(e.target.value))}
+                className="w-full h-1 rounded-full appearance-none cursor-pointer"
+                style={{ background: "rgba(255,255,255,0.12)", accentColor: "rgba(255,255,255,0.5)" }} />
+            </div>
+
+            <div className="mb-3">
+              <div className="flex justify-between text-[10px] text-white/40 mb-1">
+                <span>Depth</span><span>{depthGap}px</span>
+              </div>
+              <input type="range" min={80} max={400} step={10} value={depthGap}
+                onChange={e => setDepthGap(Number(e.target.value))}
+                className="w-full h-1 rounded-full appearance-none cursor-pointer"
+                style={{ background: "rgba(255,255,255,0.12)", accentColor: "rgba(255,255,255,0.5)" }} />
+            </div>
+
+            <div className="mb-1">
+              <div className="flex justify-between text-[10px] text-white/40 mb-1">
+                <span>Zoom</span><span>{zoom.toFixed(2)}x</span>
+              </div>
+              <input type="range" min={0.6} max={2.5} step={0.01} value={zoom}
+                onChange={e => setZoom(Number(e.target.value))}
+                className="w-full h-1 rounded-full appearance-none cursor-pointer"
+                style={{ background: "rgba(255,255,255,0.12)", accentColor: "rgba(255,255,255,0.5)" }} />
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Play/Pause button — bottom right */}
+      <button onClick={() => setAutoPlay(p => !p)}
+        className="absolute bottom-8 right-4 flex items-center justify-center z-[100] transition-all hover:scale-105 active:scale-95"
+        style={{
+          width: 52, height: 52,
+          borderRadius: 26,
+          background: autoPlay ? "rgba(123,97,255,0.12)" : "rgba(255,255,255,0.12)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          boxShadow: autoPlay ? "0 0 20px rgba(123,97,255,0.15)" : "0 8px 32px rgba(0,0,0,0.2), 0 0 0 0.5px rgba(255,255,255,0.08)",
+        }}>
+        {autoPlay ? (
+          <svg width={16} height={16} viewBox="0 0 16 16" fill="none">
+            <rect x="3.5" y="2" width="3" height="12" rx="1" fill="rgba(255,255,255,0.8)"/>
+            <rect x="9.5" y="2" width="3" height="12" rx="1" fill="rgba(255,255,255,0.8)"/>
+          </svg>
+        ) : (
+          <svg width={16} height={16} viewBox="0 0 16 16" fill="none">
+            <path d="M4 2l10 6-10 6V2z" fill="rgba(255,255,255,0.7)"/>
+          </svg>
+        )}
       </button>
     </div>
   );
@@ -438,7 +528,7 @@ function DesktopView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect:
 
 // ── Mobile Stack View ─────────────────────────────────────────────────────────
 
-function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?: (i: number) => void }) {
+function MobileView({ onAdd, onCardSelect, onCardTheme, onMyDrop, hasDrops }: { onAdd: () => void; onCardSelect?: (i: number) => void; onCardTheme?: (themeId: string) => void; onMyDrop?: () => void; hasDrops?: boolean }) {
   const [mode, setMode] = useState<"stack" | "carousel" | "scatter" | "feed">("stack");
   const [scrollPos, setScrollPos] = useState(0);
   const [scrollPosX, setScrollPosX] = useState(0);
@@ -965,7 +1055,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
             <div
               key={i}
               style={getStyle(i)}
-              onClick={mode === "scatter" || mode === "feed" ? (e) => { e.stopPropagation(); onCardSelect?.(i); } : undefined}
+              onClick={mode === "scatter" || mode === "feed" ? (e) => { e.stopPropagation(); onCardSelect?.(i); onCardTheme?.(CARD_THEMES[i % CARD_THEMES.length]); } : undefined}
               onPointerDown={(e) => {
                 const startX = e.clientX;
                 const startY = e.clientY;
@@ -1013,7 +1103,7 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
       </div>
 
       <button
-        onClick={e => { e.stopPropagation(); onAdd(); }}
+        onClick={e => { e.stopPropagation(); hasDrops ? onMyDrop?.() : onAdd(); }}
         className="absolute z-[200] flex items-center justify-center gap-2 transition-transform active:scale-95 left-1/2 -translate-x-1/2"
         style={{
           bottom: 28,
@@ -1030,8 +1120,8 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
           whiteSpace: "nowrap",
           border: "none",
         }}>
-        <Plus size={16} color="#fff" />
-        Create your drops
+        {hasDrops ? <Layers size={16} color="#fff" /> : <Plus size={16} color="#fff" />}
+        {hasDrops ? "My Drop" : "Create your drops"}
       </button>
 
       {/* ── Long Press Overlay ── */}
@@ -1046,9 +1136,9 @@ function MobileView({ onAdd, onCardSelect }: { onAdd: () => void; onCardSelect?:
           onClick={() => setOverlayClosing(true)}
         >
           <motion.div
-            initial={{ scale: 0.5, rotateX: -90, opacity: 0, y: 200 }}
-            animate={overlayClosing ? { scale: 0.5, rotateX: -90, opacity: 0, y: 200 } : { scale: 1, rotateX: 0, opacity: 1, y: 0 }}
-            transition={{ type: "spring", stiffness: 150, damping: 16, duration: 0.7 }}
+            initial={{ scale: 0.3, rotateY: 720, opacity: 0, x: -200, filter: "blur(8px)" }}
+            animate={overlayClosing ? { opacity: 0, scale: 0.8, transition: { duration: 0.2 } } : { scale: 1, rotateY: 0, opacity: 1, x: 0, filter: "blur(0px)" }}
+            transition={{ duration: 1.0, ease: [0.22, 1, 0.36, 1] }}
             className="relative"
             style={{ width: 280, height: 400, perspective: "1000px", transformOrigin: "center center" }}
             onClick={e => e.stopPropagation()}
@@ -1158,40 +1248,9 @@ function CardGalleryModal({
   onPrev: () => void;
   onNext: () => void;
 }) {
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
-  const [comments, setComments] = useState<any[]>([]);
-  const [commentText, setCommentText] = useState("");
+  const [flipped, setFlipped] = useState(false);
   const [toast, setToast] = useState("");
-  const did = getDeviceId();
-
-  // load social data
-  useEffect(() => {
-    if (!card?.id) return;
-    const load = async () => {
-      const likeCount = await getLikes(card.id);
-      setLiked(false); setLikeCount(likeCount);
-      const comments = await getComments(card.id);
-      setComments(comments);
-    };
-    load();
-  }, [card?.id]);
-
-  const handleLike = async () => {
-    if (!card?.id) return;
-    const res = await toggleLike(card.id, did);
-    setLiked(res.liked);
-    setLikeCount(res.count);
-  };
-
-  const handleComment = async () => {
-    if (!card?.id || !commentText.trim()) return;
-    const c = await addComment(card.id, did, "", commentText.trim());
-    setComments(prev => [c, ...prev]);
-    setCommentText("");
-    setToast("Comment posted ✓");
-    setTimeout(() => setToast(""), 2000);
-  };
+  const isLight = card?.bg === "#FFCD29" || card?.bg === "#F5F0E8";
 
   const handleShare = () => {
     if (card?.id) shareDropLink(card.id);
@@ -1200,89 +1259,111 @@ function CardGalleryModal({
     setTimeout(() => setToast(""), 2000);
   };
 
-  const isLight = card?.bg === "#FFCD29" || card?.bg === "#F5F0E8";
-
   return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/35" onClick={onClose}>
-      <div className="relative w-[min(440px,90vw)] rounded-[14px] bg-white shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-        {/* Close */}
-        <button className="absolute right-3 top-3 z-10 w-8 h-8 rounded-full bg-white/80 flex items-center justify-center shadow" onClick={onClose}>×</button>
-        {/* Prev/Next */}
-        <button className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white/80 flex items-center justify-center shadow hidden md:flex" onClick={onPrev}>‹</button>
-        <button className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white/80 flex items-center justify-center shadow hidden md:flex" onClick={onNext}>›</button>
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[999] flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(20px)" }}
+      onClick={onClose}
+    >
+      <div className="relative flex items-center gap-4" onClick={e => e.stopPropagation()}>
+        {/* Prev */}
+        <button onClick={onPrev}
+          className="flex items-center justify-center rounded-full transition-all hover:scale-105"
+          style={{ width: 44, height: 44, background: "rgba(255,255,255,0.08)" }}>
+          <svg width={14} height={14} viewBox="0 0 12 12"><path d="M7 2L3 6l4 4" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5" fill="none"/></svg>
+        </button>
 
-        {/* Card visual */}
-        <div className="p-4 pb-0">
-          <div className="relative flex h-[340px] flex-col justify-between overflow-hidden rounded-[14px] p-5"
-            style={{ background: card?.bg || "#7B61FF", fontFamily: "Inter,sans-serif" }}>
-            <div className="flex flex-1 items-center text-[22px] font-bold leading-tight"
-              style={{ color: isLight ? "#111" : "#fff" }}>
-              {card?.quote || ""}
-            </div>
-            <div className="flex justify-between items-end">
-              <div className="text-[12px]" style={{ color: isLight ? "rgba(17,17,17,0.45)" : "rgba(255,255,255,0.45)" }}>
-                {card?.handle || ""}
+        {/* Flip card — 2x size */}
+        <div style={{ perspective: "1000px" }}>
+          <motion.div
+            className="relative cursor-pointer"
+            style={{
+              width: 560, height: 800,
+              transformStyle: "preserve-3d",
+            }}
+            initial={{ scale: 0.3, rotateY: 720, opacity: 0, x: -200, filter: "blur(10px)" }}
+            animate={{ scale: 1, rotateY: flipped ? 180 : 0, opacity: 1, x: 0, filter: "blur(0px)" }}
+            transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+            onClick={() => setFlipped(p => !p)}
+          >
+            {/* Front */}
+            <div
+              className="absolute inset-0 overflow-hidden rounded-[18px] flex flex-col justify-between"
+              style={{
+                backfaceVisibility: "hidden",
+                background: card?._themeId && CARD_THEMES.includes(card._themeId)
+                  ? `url(/cards/card-${card._themeId}.png) center/cover no-repeat`
+                  : card?.bg || "#7B61FF",
+                boxShadow: "0 24px 80px rgba(0,0,0,0.3)",
+              }}
+            >
+              <div className="flex-1 flex items-center p-8">
+                <p className="font-bold text-3xl leading-tight break-words"
+                  style={{ color: isLight ? "#111" : "#fff", fontFamily: card?.fontStyle || undefined }}>
+                  {card?.quote || ""}
+                </p>
               </div>
-              {card?.userName && (
-                <div className="text-[10px] text-right" style={{ color: isLight ? "rgba(17,17,17,0.3)" : "rgba(255,255,255,0.3)" }}>
-                  {card.userName}{card.userRole ? ` · ${card.userRole}` : ""}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Social bar */}
-        <div className="px-4 pt-3 flex items-center gap-3 text-sm">
-          {/* Like */}
-          <button onClick={handleLike} className="flex items-center gap-1 transition-transform active:scale-125"
-            style={{ color: liked ? "#F24822" : "rgba(17,17,17,0.4)" }}>
-            {liked ? "❤️" : "🤍"} <span className="text-xs">{likeCount}</span>
-          </button>
-          {/* Share */}
-          <button onClick={handleShare} className="ml-auto text-xs text-[rgba(17,17,17,0.35)] underline">Share</button>
-        </div>
-
-        {/* Comments */}
-        <div className="px-4 pt-3 pb-2">
-          <div className="flex gap-2">
-            <input value={commentText} onChange={e => setCommentText(e.target.value)}
-              placeholder="Add a comment…" maxLength={120}
-              className="flex-1 h-9 rounded-xl px-3 text-xs outline-none bg-[rgba(17,17,17,0.05)] text-[#111] placeholder:text-[rgba(17,17,17,0.25)]"
-              onKeyDown={e => { if (e.key === "Enter") handleComment(); }}
-            />
-            <button onClick={handleComment} disabled={!commentText.trim()}
-              className="px-3 h-9 rounded-xl text-xs font-medium"
-              style={{ background: commentText.trim() ? "#7B61FF" : "rgba(17,17,17,0.08)", color: commentText.trim() ? "#fff" : "rgba(17,17,17,0.3)" }}>
-              Post
-            </button>
-          </div>
-        </div>
-
-        {/* Comments list */}
-        {comments.length > 0 && (
-          <div className="px-4 pb-3 max-h-[120px] overflow-y-auto space-y-1.5">
-            {comments.slice(0, 5).map(c => (
-              <div key={c.id} className="text-xs text-[rgba(17,17,17,0.6)]">
-                <span className="font-medium text-[rgba(17,17,17,0.8)]">{c.authorName || "Anonymous"}</span>
-                <span className="ml-1">{c.text}</span>
+              <div className="px-6 pb-6 flex justify-between items-end">
+                <span className="text-sm font-medium" style={{ color: isLight ? "rgba(17,17,17,0.6)" : "rgba(255,255,255,0.7)" }}>
+                  {card?.userName || card?.handle || ""}
+                </span>
+                {card?.userRole && (
+                  <span className="text-xs" style={{ color: isLight ? "rgba(17,17,17,0.4)" : "rgba(255,255,255,0.4)" }}>
+                    {card.userRole}
+                  </span>
+                )}
               </div>
-            ))}
-          </div>
-        )}
+            </div>
 
-        {/* Counter */}
-        <div className="pb-3 text-center text-[10px] text-[rgba(17,17,17,0.25)]">{index + 1} of {total}</div>
-
-        {/* Toast */}
-        {toast && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-[#111] text-white text-xs shadow">
-            {toast}
+            {/* Back */}
+            <div
+              className="absolute inset-0 overflow-hidden rounded-[18px] flex flex-col items-center justify-center gap-4"
+              style={{
+                backfaceVisibility: "hidden",
+                transform: "rotateY(180deg)",
+                background: "linear-gradient(135deg, #1a1a2e, #16213e, #0f3460)",
+                boxShadow: "0 24px 80px rgba(0,0,0,0.3)",
+              }}
+            >
+              <div className="text-6xl text-white/20">✦</div>
+              <p className="text-white/50 text-base text-center px-10">{card?.quote || ""}</p>
+              <p className="text-white/30 text-sm">{card?.handle || ""}</p>
+            </div>
           </motion.div>
-        )}
+        </div>
+
+        {/* Next */}
+        <button onClick={onNext}
+          className="flex items-center justify-center rounded-full transition-all hover:scale-105"
+          style={{ width: 44, height: 44, background: "rgba(255,255,255,0.08)" }}>
+          <svg width={14} height={14} viewBox="0 0 12 12"><path d="M5 2l4 4-4 4" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5" fill="none"/></svg>
+        </button>
       </div>
-    </div>
+
+      {/* Share — top right */}
+      <button onClick={handleShare}
+        className="absolute top-5 right-16 flex items-center justify-center rounded-full"
+        style={{ width: 40, height: 40, background: "rgba(255,255,255,0.08)" }}>
+        <svg width={14} height={14} viewBox="0 0 14 14"><path d="M10 4L4 7l6 3V4z" fill="rgba(255,255,255,0.6)"/><circle cx="11.5" cy="2.5" r="2" stroke="rgba(255,255,255,0.6)" strokeWidth="1.2" fill="none"/><circle cx="11.5" cy="11.5" r="2" stroke="rgba(255,255,255,0.6)" strokeWidth="1.2" fill="none"/><circle cx="4" cy="7" r="2" stroke="rgba(255,255,255,0.6)" strokeWidth="1.2" fill="none"/></svg>
+      </button>
+
+      {/* Close button */}
+      <button onClick={onClose}
+        className="absolute top-5 right-5 flex items-center justify-center rounded-full"
+        style={{ width: 40, height: 40, background: "rgba(255,255,255,0.08)" }}>
+        <svg width={14} height={14} viewBox="0 0 14 14"><path d="M2 2l10 10M12 2L2 12" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5"/></svg>
+      </button>
+
+      {/* Toast */}
+      {toast && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+          className="fixed bottom-8 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full text-xs shadow z-[1000]"
+          style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(16px)", color: "#fff" }}>
+          {toast}
+        </motion.div>
+      )}
+    </motion.div>
   );
 }
 
@@ -1292,14 +1373,27 @@ export default function App() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [showModal, setShowModal] = useState(false);
   const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
+  const [selectedCardThemeId, setSelectedCardThemeId] = useState<string | null>(null);
+  const [imagesLoaded, setImagesLoaded] = useState(false);
+
+  // Preload card theme images
+  useEffect(() => {
+    if (imagesLoaded) return;
+    let loaded = 0;
+    const total = CARD_THEMES.length;
+    CARD_THEMES.forEach(t => {
+      const img = new Image();
+      img.onload = img.onerror = () => { loaded++; if (loaded >= total) setImagesLoaded(true); };
+      img.src = `/cards/card-${t}.png`;
+    });
+  }, [imagesLoaded]);
 
   // onboarding gate
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem(ONBOARDING_KEY) === "true");
   const [animated, setAnimated] = useState(() => localStorage.getItem("drops_animated") === "true");
 
   // new screens
-  const [showMyDrops, setShowMyDrops] = useState(false);
-  const [showFriends, setShowFriends] = useState(false);
+  const [showMyDropHub, setShowMyDropHub] = useState(false);
   const [showQrScanner, setShowQrScanner] = useState(false);
   const [showOnboardingMenu, setShowOnboardingMenu] = useState(false);
   const [qrPreviewCard, setQrPreviewCard] = useState<UserCard | null>(null);
@@ -1373,6 +1467,8 @@ export default function App() {
     id: (u as any).id || `seed-${idx}`,
     userName: (u as any).userName,
     userRole: (u as any).userRole,
+    themeId: (u as any).themeId || CARD_THEMES[idx % CARD_THEMES.length],
+    fontStyle: (u as any).fontStyle,
   }));
 
   const handlePost = async (card: UserCard) => {
@@ -1404,6 +1500,15 @@ export default function App() {
     }
   };
 
+  // bypass — reset state for testing
+  const isBypass = typeof window !== "undefined" && (window.location.pathname === "/bypass" || window.location.search.includes("bypass"));
+  if (isBypass) {
+    localStorage.removeItem(ONBOARDING_KEY);
+    localStorage.removeItem(CARDS_KEY);
+    window.history.replaceState(null, "", "/");
+    window.location.reload();
+  }
+
   // onboarding gate — must check before admin
   const isAdmin = typeof window !== "undefined" && (window.location.pathname === "/admin" || window.location.hash === "#admin");
   if (isAdmin) {
@@ -1413,20 +1518,32 @@ export default function App() {
     return <Onboarding onComplete={() => setOnboarded(true)} />;
   }
 
+  if (!imagesLoaded) {
+    return (
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black" style={{ fontFamily: "Inter,sans-serif" }}>
+        <div className="text-center">
+          <div className="text-4xl text-white/20 mb-4">✦</div>
+          <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-white/60 animate-spin mx-auto" />
+          <p className="text-white/30 text-xs mt-4">Loading drops…</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-full" style={{ fontFamily: "Inter, sans-serif", background: "#000000" }}>
       {isMobile
-        ? <MobileView key={userCards.length} onAdd={() => setShowModal(true)} onCardSelect={(i) => setSelectedCardIndex(i)} />
-        : <DesktopView key={userCards.length} onAdd={() => setShowModal(true)} onCardSelect={(i) => setSelectedCardIndex(i)} />
+        ? <MobileView key={userCards.length} onAdd={() => setShowModal(true)} onCardSelect={(i) => setSelectedCardIndex(i)} onCardTheme={(t) => setSelectedCardThemeId(t)} hasDrops={userCards.length > 0} onMyDrop={() => setShowMyDropHub(true)} />
+        : <DesktopView key={userCards.length} onAdd={() => setShowModal(true)} onCardSelect={(i) => setSelectedCardIndex(i)} onCardTheme={(t) => setSelectedCardThemeId(t)} hasDrops={userCards.length > 0} onMyDrop={() => setShowMyDropHub(true)} onScan={() => setShowQrScanner(true)} />
       }
 
       {/* Mobile menu bar */}
       {isMobile && (
         <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-[200] flex gap-2">
           {[
-            { icon: <Layers size={14} />, label: "My Drops", onClick: () => setShowMyDrops(true) },
+            { icon: <Layers size={14} />, label: "My Drop", onClick: () => setShowMyDropHub(true) },
             { icon: <QrCode size={14} />, label: "Scan", onClick: () => setShowQrScanner(true) },
-            { icon: <Users size={14} />, label: "Connect", onClick: () => setShowFriends(true) },
+            { icon: <Users size={14} />, label: "Connect", onClick: () => setShowMyDropHub(true) },
             { icon: <HelpCircle size={14} />, label: "Help", onClick: () => setShowOnboardingMenu(true) },
           ].map((btn, i) => (
             <button key={i} onClick={btn.onClick}
@@ -1463,18 +1580,17 @@ export default function App() {
 
       {selectedCardIndex !== null && combinedCards[selectedCardIndex] && (
         <CardGalleryModal
-          card={combinedCards[selectedCardIndex]}
+          card={{ ...combinedCards[selectedCardIndex], _themeId: selectedCardThemeId }}
           index={selectedCardIndex}
           total={combinedCards.length}
-          onClose={() => setSelectedCardIndex(null)}
+          onClose={() => { setSelectedCardIndex(null); setSelectedCardThemeId(null); }}
           onPrev={() => setSelectedCardIndex(i => i !== null ? (i - 1 + combinedCards.length) % combinedCards.length : null)}
           onNext={() => setSelectedCardIndex(i => i !== null ? (i + 1) % combinedCards.length : null)}
         />
       )}
 
       {/* New screens */}
-      {showMyDrops && <MyDrops onClose={() => setShowMyDrops(false)} onViewQr={(c) => { setQrPreviewCard(c); setShowMyDrops(false); }} />}
-      {showFriends && <FriendList onClose={() => setShowFriends(false)} />}
+      {showMyDropHub && <MyDropHub onClose={() => setShowMyDropHub(false)} onAddCard={() => { setShowMyDropHub(false); setShowModal(true); }} />}
       {showQrScanner && <QrScanner onClose={() => setShowQrScanner(false)} />}
 
       {/* QR Preview overlay (standalone card flip) */}
@@ -1515,46 +1631,9 @@ export default function App() {
         </motion.div>
       )}
 
-      {/* Onboarding help menu */}
+      {/* Onboarding help menu — reuse Onboarding component with reopen mode */}
       {showOnboardingMenu && (
-        <motion.div
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          className="fixed inset-0 z-[9999] flex items-center justify-center"
-          style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(16px)" }}
-          onClick={() => setShowOnboardingMenu(false)}
-        >
-          <motion.div
-            initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }}
-            className="max-w-sm w-full mx-5 rounded-3xl p-6"
-            style={{ background: "rgba(255,255,255,0.06)" }}
-            onClick={e => e.stopPropagation()}
-          >
-            <h2 className="text-xl font-semibold text-white mb-5" style={{ fontFamily: "Inter,sans-serif" }}>How DROPS works</h2>
-            <div className="flex flex-col gap-3">
-              {[
-                { icon: "✦", title: "Create a card", desc: "Tap the button and design your drop" },
-                { icon: "✎", title: "Customize", desc: "Pick a theme, font, color, sticker" },
-                { icon: "👆", title: "Explore", desc: "Stack, carousel, feed — tap twice to switch" },
-                { icon: "↻", title: "Flip to QR", desc: "Tap any card to see its QR code" },
-                { icon: "📷", title: "Scan & connect", desc: "Scan someone's QR to connect" },
-                { icon: "↗", title: "Share drops", desc: "Share your wall or individual drops" },
-              ].map((item, i) => (
-                <div key={i} className="flex gap-3 items-start">
-                  <span className="text-lg w-6 text-center">{item.icon}</span>
-                  <div>
-                    <p className="text-sm font-medium text-white">{item.title}</p>
-                    <p className="text-xs text-white/40">{item.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button onClick={() => setShowOnboardingMenu(false)}
-              className="w-full mt-6 py-4 rounded-2xl text-sm font-medium"
-              style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }}>
-              Got it
-            </button>
-          </motion.div>
-        </motion.div>
+        <Onboarding onComplete={() => setShowOnboardingMenu(false)} reopen />
       )}
 
       <Toast />

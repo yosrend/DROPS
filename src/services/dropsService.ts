@@ -53,7 +53,18 @@ export async function getDrops(): Promise<UserCard[]> {
 }
 
 export async function getMyDrops(deviceId: string): Promise<UserCard[]> {
-  // Read from localStorage directly (user's own created cards)
+  const sb = await getSupabase();
+  if (sb) {
+    try {
+      const { data } = await sb
+        .from(TABLE)
+        .select("*")
+        .eq("device_id", deviceId)
+        .order("created_at", { ascending: false });
+      if (data) return mapPostsToCards(data);
+    } catch { /* fall through */ }
+  }
+  // localStorage fallback
   const stored = localStorage.getItem(CARDS_KEY);
   try {
     const cards: UserCard[] = stored ? JSON.parse(stored) : [];

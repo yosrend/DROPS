@@ -341,7 +341,7 @@ export default function AddCardModal({ onClose, onPost, cardCount }: { onClose: 
                 <Button onClick={handleSubmit} disabled={elements.length === 0}
                   className="w-full h-14 rounded-xl text-base font-semibold text-white"
                   style={{ background: elements.length > 0 ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.04)", backdropFilter: "blur(16px)" }}>
-                  Add To Card
+                  Share Your Drop
                 </Button>
               </div>
             )}
@@ -351,14 +351,18 @@ export default function AddCardModal({ onClose, onPost, cardCount }: { onClose: 
         {/* ── RIGHT PANEL ── */}
         <div className="hidden md:flex flex-1 flex-col relative overflow-hidden" style={{ minWidth: 480, background: "rgba(0,0,0,0.4)" }}>
           <div className="flex items-center justify-between px-6 pt-5 pb-3">
+            <button onClick={onClose} className="flex items-center justify-center rounded-full transition-opacity hover:opacity-75" style={{ width: 44, height: 44, background: "rgba(255,255,255,0.12)", backdropFilter: "blur(12px)" }}><X size={18} color="#fff" /></button>
             <div className="flex gap-1 p-0.5 rounded-lg" style={{ background: "rgba(255,255,255,0.08)" }}>
               {(["front", "back"] as const).map(side => (
                 <button key={side} onClick={() => setCardSide(side)} className="px-4 py-1.5 rounded-[6px] text-sm transition-all" style={{ background: cardSide === side ? "rgba(255,255,255,0.12)" : "transparent", color: cardSide === side ? "#fff" : "rgba(255,255,255,0.4)" }}>{side.charAt(0).toUpperCase() + side.slice(1)}</button>
               ))}
             </div>
-            <button onClick={onClose} className="flex items-center justify-center rounded-full transition-opacity hover:opacity-75" style={{ width: 44, height: 44, background: "rgba(255,255,255,0.12)", backdropFilter: "blur(12px)" }}><X size={18} color="#fff" /></button>
           </div>
           <div className="flex-1 flex items-center justify-center pb-4">{renderCardPreview()}</div>
+          {/* Bottom-right close */}
+          <div className="absolute bottom-5 right-5 z-10">
+            <button onClick={onClose} className="flex items-center justify-center rounded-full transition-opacity hover:opacity-75" style={{ width: 40, height: 40, background: "rgba(255,255,255,0.12)", backdropFilter: "blur(12px)" }}><svg width={14} height={14} viewBox="0 0 14 14"><path d="M2 2l10 10M12 2L2 12" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5"/></svg></button>
+          </div>
           <div className="px-6 pb-5 flex flex-col gap-3">
             <p className="text-sm font-semibold text-center text-white/40" style={{ fontFamily: "Inter, sans-serif" }}>Theme</p>
             <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
